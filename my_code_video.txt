@@ -1,0 +1,77 @@
+## Code To video
+
+"""
+    Convert code to video with audio explanation
+    
+    Works for:
+    - Python code
+    - JavaScript code
+    - Any programming code
+    
+    Args:
+        code_content: The code you want to explain
+        output_name: Name for output file
+        audio_language: Language for audio narration
+        
+    Returns:
+        dict with 'final_video' path or None if failed
+"""
+
+ 1. Parse Code into Blocks
+    
+    What it does:
+    Detects language (Python/Java/JavaScript)
+    Calls parse_code_to_blocks() to extract semantic blocks (functions, loops, if statements)
+    Filters out large blocks (entire classes/functions) to focus on smaller, highlightable blocks
+    
+    Why:
+    Large blocks are hard to highlight precisely
+    Smaller blocks (loops, if statements) align better with narration
+    
+    Without parsing:
+    Highlight entire code at once
+    No way to sync specific parts with narration
+    Result: Generic highlighting, no sync
+    
+    With parsing:
+    Code split into logical blocks (loops, functions, if statements)
+    Each block can be highlighted individually
+    Result: Precise highlighting per block
+
+    Output:
+    [
+    {
+        'type': 'function',
+        'name': 'findLargest',
+        'start_line': 2,      # Line number where function starts
+        'end_line': 10,        # Line number where function ends
+        'code': 'function findLargest(arr) {\n    let largest = arr[0]; \n    for (let i = 1; i < arr.length; i++) {\n        if (arr[i] > largest) {\n            largest = arr[i]; \n        }\n    }\n    return largest;\n}'
+    },
+    {
+        'type': 'for_loop',
+        'name': None,          # Loops don't have names
+        'start_line': 4,       # Line number where for loop starts
+        'end_line': 8,         # Line number where for loop ends
+        'code': '    for (let i = 1; i < arr.length; i++) {\n        if (arr[i] > largest) {\n            largest = arr[i]; \n        }\n    }'
+    }
+   ]
+
+
+
+ 2. from parse_code_to_blocks array filter largest block
+    Why we filter blocks
+        Problem: The parser finds all blocks, including large ones:
+        Entire functions (could be 20+ lines)
+        Entire classes (could be 50+ lines)
+        Large outer loops that contain everything
+
+    Why this is bad for highlighting:
+        Large blocks are too generic — highlighting 20 lines doesn't help explain a specific part
+        Poor synchronization — narration for a 3-line loop shouldn't highlight 20 lines
+        Confusing visuals — highlighting half the screen isn't useful
+        Solution: Filter to keep only small, specific blocks:
+        Individual loops (3-5 lines)
+        Individual if statements (2-3 lines)
+        Skip entire functions/classes unless they're tiny
+
+ 3. Generate narration of each block
