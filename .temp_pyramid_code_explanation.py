@@ -9,25 +9,17 @@ class CodeExplanationScene(Scene):
         self.wait(1)
         
         full_code = Text(
-            """// Java Program to Print the Pyramid pattern
-// Main class
-public class GFG {
-    // Main driver method
+            """public class GFG {
     public static void main(String[] args)
     {
         int num = 5;
         int x = 0;
-        // Outer loop for rows
         for (int i = 1; i <= num; i++) {
             x = i - 1;
-            // inner loop for \"i\"th row printing
             for (int j = i; j <= num - 1; j++) {
-                // First Number Space
                 System.out.print(\" \");
-                // Space between Numbers
                 System.out.print(\"  \");
             }
-            // Pyramid printing
             for (int j = 0; j <= x; j++)
                 System.out.print((i + j) < 10
                                      ? (i + j) + \"  \"
@@ -36,8 +28,6 @@ public class GFG {
                 System.out.print((i + x - j) < 10
                                      ? (i + x - j) + \"  \"
                                      : (i + x - j) + \" \");
-            // By now we reach end for one row, so
-            // new line to switch to next
             System.out.println();
         }
     }
@@ -53,69 +43,69 @@ public class GFG {
         
         full_code.to_edge(LEFT, buff=0.5)
         
-        # Highlight rectangle for block: lines 17-24 (5 lines)
-        # Block height calculation: 5 lines × 0.688 line_height = 3.438
+        # Highlight rectangle for block: lines 17-24 (4 lines)
+        # Block height calculation: 4 lines × 0.421 line_height = 1.683
         highlight_0 = Rectangle(
             width=12,
-            height=3.438,
+            height=1.683,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=3,
             stroke_color="#4A90E2",
             stroke_opacity=0.0
         )
-        # CRITICAL: Verify highlight height covers all 5 lines
+        # CRITICAL: Verify highlight height covers all 4 lines
         # If highlight appears too small, increase line_height or block_height
         # Add glow effect (slightly larger, semi-transparent)
         highlight_glow_0 = Rectangle(
             width=12.4,
-            height=3.538,
+            height=1.783,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=5,
             stroke_color="#4A90E2",
             stroke_opacity=0.0
         )
-        # Highlight rectangle for block: lines 27-28 (1 lines)
-        # Block height calculation: 1 lines × 0.688 line_height = 0.688
+        # Highlight rectangle for block: lines 27-30 (4 lines)
+        # Block height calculation: 4 lines × 0.421 line_height = 1.683
         highlight_1 = Rectangle(
             width=12,
-            height=0.688,
+            height=1.683,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=3,
             stroke_color="#4A90E2",
             stroke_opacity=0.0
         )
-        # CRITICAL: Verify highlight height covers all 1 lines
+        # CRITICAL: Verify highlight height covers all 4 lines
         # If highlight appears too small, increase line_height or block_height
         # Add glow effect (slightly larger, semi-transparent)
         highlight_glow_1 = Rectangle(
             width=12.4,
-            height=0.787,
+            height=1.783,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=5,
             stroke_color="#4A90E2",
             stroke_opacity=0.0
         )
-        # Highlight rectangle for block: lines 32-33 (1 lines)
-        # Block height calculation: 1 lines × 0.688 line_height = 0.688
+        # Highlight rectangle for block: lines 32-35 (4 lines)
+        # Block height calculation: 4 lines × 0.421 line_height = 1.683
         highlight_2 = Rectangle(
             width=12,
-            height=0.688,
+            height=1.683,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=3,
             stroke_color="#4A90E2",
             stroke_opacity=0.0
         )
-        # CRITICAL: Verify highlight height covers all 1 lines
+        # CRITICAL: Verify highlight height covers all 4 lines
         # If highlight appears too small, increase line_height or block_height
         # Add glow effect (slightly larger, semi-transparent)
         highlight_glow_2 = Rectangle(
             width=12.4,
-            height=0.787,
+            height=1.783,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=5,
@@ -134,10 +124,14 @@ public class GFG {
             end_center_y = -3.5 + (code_height / 2)
             scroll_distance = end_center_y - start_center_y
             
-            block_0_center_y = full_code.get_top()[1] - (13.0 * 0.688)
+            # Position highlight for lines 8-11 (0-indexed: 7-10)
+            # Top of line 7 is at: full_code.get_top()[1] - (7 * 0.421)
+            # Center of block is at: top_of_start_line - (1.683 / 2)
+            block_0_top_y = full_code.get_top()[1] - (7 * 0.421)
+            block_0_center_y = block_0_top_y - (1.683 / 2.0)
             highlight_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
             highlight_0.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 0.688 (for 1 lines)
+            # Highlight height: 1.683 (for 4 lines)
             highlight_0.set_z_index(-1)
             highlight_0.set_opacity(0)
             highlight_0.set_stroke_opacity(0)
@@ -146,10 +140,14 @@ public class GFG {
             highlight_glow_0.set_z_index(-2)
             highlight_glow_0.set_opacity(0)
             highlight_glow_0.set_stroke_opacity(0)
-            block_1_center_y = full_code.get_top()[1] - (18.0 * 0.688)
+            # Position highlight for lines 12-15 (0-indexed: 11-14)
+            # Top of line 11 is at: full_code.get_top()[1] - (11 * 0.421)
+            # Center of block is at: top_of_start_line - (1.683 / 2)
+            block_1_top_y = full_code.get_top()[1] - (11 * 0.421)
+            block_1_center_y = block_1_top_y - (1.683 / 2.0)
             highlight_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
             highlight_1.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 0.688 (for 1 lines)
+            # Highlight height: 1.683 (for 4 lines)
             highlight_1.set_z_index(-1)
             highlight_1.set_opacity(0)
             highlight_1.set_stroke_opacity(0)
@@ -158,10 +156,14 @@ public class GFG {
             highlight_glow_1.set_z_index(-2)
             highlight_glow_1.set_opacity(0)
             highlight_glow_1.set_stroke_opacity(0)
-            block_2_center_y = full_code.get_top()[1] - (22.0 * 0.688)
+            # Position highlight for lines 16-19 (0-indexed: 15-18)
+            # Top of line 15 is at: full_code.get_top()[1] - (15 * 0.421)
+            # Center of block is at: top_of_start_line - (1.683 / 2)
+            block_2_top_y = full_code.get_top()[1] - (15 * 0.421)
+            block_2_center_y = block_2_top_y - (1.683 / 2.0)
             highlight_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
             highlight_2.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 0.688 (for 1 lines)
+            # Highlight height: 1.683 (for 4 lines)
             highlight_2.set_z_index(-1)
             highlight_2.set_opacity(0)
             highlight_2.set_stroke_opacity(0)
@@ -177,14 +179,16 @@ public class GFG {
             self.add(all_highlights)
             self.play(FadeIn(full_code), run_time=0.5)
             
-            self.wait(87.67)
+            self.wait(109.11)
             # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 163.22 > 0 and scroll_distance > 0 else 0.0
-            if 163.22 > 0 and scroll_distance > 0:
-                seg_target_y = start_center_y + (scroll_distance * 0.267)
+            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
+            if 198.09 > 0 and scroll_distance > 0:
+                seg_target_y = start_center_y + (scroll_distance * 0.000)
                 # CRITICAL: Update highlight positions relative to new code position after scroll
                 code_top_y = seg_target_y + (full_code.height / 2)
-                block_0_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_0_top_y = code_top_y - (15 * 0.421)
+                block_0_center_y = block_0_top_y - (1.683 / 2.0)
                 highlight_0.move_to([code_center_x, block_0_center_y, 0])
                 highlight_glow_0.move_to([code_center_x, block_0_center_y, 0])
                 self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
@@ -192,7 +196,9 @@ public class GFG {
                 # No scrolling - highlights are already positioned correctly in highlight_positioning
                 # Just ensure they're at the right position relative to current code position
                 code_top_y = full_code.get_top()[1]
-                block_0_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_0_top_y = code_top_y - (15 * 0.421)
+                block_0_center_y = block_0_top_y - (1.683 / 2.0)
                 highlight_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
                 highlight_glow_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
             
@@ -225,7 +231,7 @@ public class GFG {
                 highlight_glow_0.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 20.02 - scroll_time - 1.1
+            remaining_time = 27.82 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             # Fade out previous highlight
@@ -235,12 +241,14 @@ public class GFG {
                 run_time=0.3
             )
             # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 163.22 > 0 and scroll_distance > 0 else 0.0
-            if 163.22 > 0 and scroll_distance > 0:
-                seg_target_y = start_center_y + (scroll_distance * 0.600)
+            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
+            if 198.09 > 0 and scroll_distance > 0:
+                seg_target_y = start_center_y + (scroll_distance * 0.700)
                 # CRITICAL: Update highlight positions relative to new code position after scroll
                 code_top_y = seg_target_y + (full_code.height / 2)
-                block_1_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_1_top_y = code_top_y - (15 * 0.421)
+                block_1_center_y = block_1_top_y - (1.683 / 2.0)
                 highlight_1.move_to([code_center_x, block_1_center_y, 0])
                 highlight_glow_1.move_to([code_center_x, block_1_center_y, 0])
                 self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
@@ -248,7 +256,9 @@ public class GFG {
                 # No scrolling - highlights are already positioned correctly in highlight_positioning
                 # Just ensure they're at the right position relative to current code position
                 code_top_y = full_code.get_top()[1]
-                block_1_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_1_top_y = code_top_y - (15 * 0.421)
+                block_1_center_y = block_1_top_y - (1.683 / 2.0)
                 highlight_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
                 highlight_glow_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
             
@@ -281,7 +291,7 @@ public class GFG {
                 highlight_glow_1.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 27.43 - scroll_time - 1.1
+            remaining_time = 28.24 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             # Fade out previous highlight
@@ -291,12 +301,14 @@ public class GFG {
                 run_time=0.3
             )
             # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 163.22 > 0 and scroll_distance > 0 else 0.0
-            if 163.22 > 0 and scroll_distance > 0:
-                seg_target_y = start_center_y + (scroll_distance * 0.867)
+            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
+            if 198.09 > 0 and scroll_distance > 0:
+                seg_target_y = start_center_y + (scroll_distance * 1.000)
                 # CRITICAL: Update highlight positions relative to new code position after scroll
                 code_top_y = seg_target_y + (full_code.height / 2)
-                block_2_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_2_top_y = code_top_y - (15 * 0.421)
+                block_2_center_y = block_2_top_y - (1.683 / 2.0)
                 highlight_2.move_to([code_center_x, block_2_center_y, 0])
                 highlight_glow_2.move_to([code_center_x, block_2_center_y, 0])
                 self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
@@ -304,7 +316,9 @@ public class GFG {
                 # No scrolling - highlights are already positioned correctly in highlight_positioning
                 # Just ensure they're at the right position relative to current code position
                 code_top_y = full_code.get_top()[1]
-                block_2_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_2_top_y = code_top_y - (15 * 0.421)
+                block_2_center_y = block_2_top_y - (1.683 / 2.0)
                 highlight_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
                 highlight_glow_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
             
@@ -337,7 +351,7 @@ public class GFG {
                 highlight_glow_2.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 28.10 - scroll_time - 1.1
+            remaining_time = 32.91 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             self.play(highlight_2.animate.set_opacity(0), run_time=0.2)
@@ -353,10 +367,14 @@ public class GFG {
             
             # Position highlights even when code doesn't scroll
             
-            block_0_center_y = full_code.get_top()[1] - (13.0 * 0.688)
+            # Position highlight for lines 8-11 (0-indexed: 7-10)
+            # Top of line 7 is at: full_code.get_top()[1] - (7 * 0.421)
+            # Center of block is at: top_of_start_line - (1.683 / 2)
+            block_0_top_y = full_code.get_top()[1] - (7 * 0.421)
+            block_0_center_y = block_0_top_y - (1.683 / 2.0)
             highlight_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
             highlight_0.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 0.688 (for 1 lines)
+            # Highlight height: 1.683 (for 4 lines)
             highlight_0.set_z_index(-1)
             highlight_0.set_opacity(0)
             highlight_0.set_stroke_opacity(0)
@@ -365,10 +383,14 @@ public class GFG {
             highlight_glow_0.set_z_index(-2)
             highlight_glow_0.set_opacity(0)
             highlight_glow_0.set_stroke_opacity(0)
-            block_1_center_y = full_code.get_top()[1] - (18.0 * 0.688)
+            # Position highlight for lines 12-15 (0-indexed: 11-14)
+            # Top of line 11 is at: full_code.get_top()[1] - (11 * 0.421)
+            # Center of block is at: top_of_start_line - (1.683 / 2)
+            block_1_top_y = full_code.get_top()[1] - (11 * 0.421)
+            block_1_center_y = block_1_top_y - (1.683 / 2.0)
             highlight_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
             highlight_1.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 0.688 (for 1 lines)
+            # Highlight height: 1.683 (for 4 lines)
             highlight_1.set_z_index(-1)
             highlight_1.set_opacity(0)
             highlight_1.set_stroke_opacity(0)
@@ -377,10 +399,14 @@ public class GFG {
             highlight_glow_1.set_z_index(-2)
             highlight_glow_1.set_opacity(0)
             highlight_glow_1.set_stroke_opacity(0)
-            block_2_center_y = full_code.get_top()[1] - (22.0 * 0.688)
+            # Position highlight for lines 16-19 (0-indexed: 15-18)
+            # Top of line 15 is at: full_code.get_top()[1] - (15 * 0.421)
+            # Center of block is at: top_of_start_line - (1.683 / 2)
+            block_2_top_y = full_code.get_top()[1] - (15 * 0.421)
+            block_2_center_y = block_2_top_y - (1.683 / 2.0)
             highlight_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
             highlight_2.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 0.688 (for 1 lines)
+            # Highlight height: 1.683 (for 4 lines)
             highlight_2.set_z_index(-1)
             highlight_2.set_opacity(0)
             highlight_2.set_stroke_opacity(0)
@@ -399,14 +425,16 @@ public class GFG {
             
             # Run animation timeline for highlights (even without scrolling)
             
-            self.wait(87.67)
+            self.wait(109.11)
             # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 163.22 > 0 and scroll_distance > 0 else 0.0
-            if 163.22 > 0 and scroll_distance > 0:
-                seg_target_y = start_center_y + (scroll_distance * 0.267)
+            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
+            if 198.09 > 0 and scroll_distance > 0:
+                seg_target_y = start_center_y + (scroll_distance * 0.000)
                 # CRITICAL: Update highlight positions relative to new code position after scroll
                 code_top_y = seg_target_y + (full_code.height / 2)
-                block_0_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_0_top_y = code_top_y - (15 * 0.421)
+                block_0_center_y = block_0_top_y - (1.683 / 2.0)
                 highlight_0.move_to([code_center_x, block_0_center_y, 0])
                 highlight_glow_0.move_to([code_center_x, block_0_center_y, 0])
                 self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
@@ -414,7 +442,9 @@ public class GFG {
                 # No scrolling - highlights are already positioned correctly in highlight_positioning
                 # Just ensure they're at the right position relative to current code position
                 code_top_y = full_code.get_top()[1]
-                block_0_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_0_top_y = code_top_y - (15 * 0.421)
+                block_0_center_y = block_0_top_y - (1.683 / 2.0)
                 highlight_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
                 highlight_glow_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
             
@@ -447,7 +477,7 @@ public class GFG {
                 highlight_glow_0.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 20.02 - scroll_time - 1.1
+            remaining_time = 27.82 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             # Fade out previous highlight
@@ -457,12 +487,14 @@ public class GFG {
                 run_time=0.3
             )
             # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 163.22 > 0 and scroll_distance > 0 else 0.0
-            if 163.22 > 0 and scroll_distance > 0:
-                seg_target_y = start_center_y + (scroll_distance * 0.600)
+            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
+            if 198.09 > 0 and scroll_distance > 0:
+                seg_target_y = start_center_y + (scroll_distance * 0.700)
                 # CRITICAL: Update highlight positions relative to new code position after scroll
                 code_top_y = seg_target_y + (full_code.height / 2)
-                block_1_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_1_top_y = code_top_y - (15 * 0.421)
+                block_1_center_y = block_1_top_y - (1.683 / 2.0)
                 highlight_1.move_to([code_center_x, block_1_center_y, 0])
                 highlight_glow_1.move_to([code_center_x, block_1_center_y, 0])
                 self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
@@ -470,7 +502,9 @@ public class GFG {
                 # No scrolling - highlights are already positioned correctly in highlight_positioning
                 # Just ensure they're at the right position relative to current code position
                 code_top_y = full_code.get_top()[1]
-                block_1_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_1_top_y = code_top_y - (15 * 0.421)
+                block_1_center_y = block_1_top_y - (1.683 / 2.0)
                 highlight_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
                 highlight_glow_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
             
@@ -503,7 +537,7 @@ public class GFG {
                 highlight_glow_1.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 27.43 - scroll_time - 1.1
+            remaining_time = 28.24 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             # Fade out previous highlight
@@ -513,12 +547,14 @@ public class GFG {
                 run_time=0.3
             )
             # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 163.22 > 0 and scroll_distance > 0 else 0.0
-            if 163.22 > 0 and scroll_distance > 0:
-                seg_target_y = start_center_y + (scroll_distance * 0.867)
+            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
+            if 198.09 > 0 and scroll_distance > 0:
+                seg_target_y = start_center_y + (scroll_distance * 1.000)
                 # CRITICAL: Update highlight positions relative to new code position after scroll
                 code_top_y = seg_target_y + (full_code.height / 2)
-                block_2_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_2_top_y = code_top_y - (15 * 0.421)
+                block_2_center_y = block_2_top_y - (1.683 / 2.0)
                 highlight_2.move_to([code_center_x, block_2_center_y, 0])
                 highlight_glow_2.move_to([code_center_x, block_2_center_y, 0])
                 self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
@@ -526,7 +562,9 @@ public class GFG {
                 # No scrolling - highlights are already positioned correctly in highlight_positioning
                 # Just ensure they're at the right position relative to current code position
                 code_top_y = full_code.get_top()[1]
-                block_2_center_y = code_top_y - (22.0 * 0.688)
+                # Position highlight: top at first line, center based on height
+                block_2_top_y = code_top_y - (15 * 0.421)
+                block_2_center_y = block_2_top_y - (1.683 / 2.0)
                 highlight_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
                 highlight_glow_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
             
@@ -559,7 +597,7 @@ public class GFG {
                 highlight_glow_2.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 28.10 - scroll_time - 1.1
+            remaining_time = 32.91 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             self.play(highlight_2.animate.set_opacity(0), run_time=0.2)
@@ -574,14 +612,14 @@ public class GFG {
 
         concepts_title = Text("Key Concepts", font_size=38, font="Helvetica", weight=BOLD, color=BLUE)
         concepts_title.to_edge(UP, buff=0.4)
-        concept_items = VGroup(*[Text(f"• {concept}", font_size=24, font="Helvetica", color=WHITE) for concept in ["Pyramid pattern generation", "Nested loops for formatting", "Symmetric number alignment", "Java main method entry point", "Row and space management", "Conditional expression evaluation"]])
+        concept_items = VGroup(*[Text(f"• {concept}", font_size=24, font="Helvetica", color=WHITE) for concept in ["Pyramid pattern using numbers", "Nested loops for spacing and number printing", "Alignment of numbers with spaces", "Symmetrical pattern with ascending and descending numbers", "Main method in a Java program"]])
         concept_items.arrange(DOWN, aligned_edge=LEFT, buff=0.4)
         concept_items.next_to(concepts_title, DOWN, buff=0.6)
         concept_items.to_edge(LEFT, buff=0.8)
         self.play(Write(concepts_title), run_time=0.5)
         self.wait(0.3)
         self.play(Write(concept_items), run_time=1.0)
-        self.wait(9.59600904308392)
+        self.wait(14.244489387755106)
 
         
         # Ensure video duration matches audio duration

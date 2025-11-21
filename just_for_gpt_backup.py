@@ -832,41 +832,13 @@ def animation_to_video(prompt: str, output_name: str = "output"):
 # ============================================================
 
 def find_block_end(lines, start_line):
-    """Helper to find end of code block (brace matching or single statement)"""
+    """Helper to find end of code block (simple brace matching)"""
     brace_count = 0
-    found_brace = False
-    
-    # Check if the start line itself has a brace
-    start_line_content = lines[start_line - 1]
-    brace_count += start_line_content.count('{') - start_line_content.count('}')
-    if '{' in start_line_content:
-        found_brace = True
-        
-    # If we already found a brace and count is 0, it might be a one-line block like "void foo() {}"
-    if found_brace and brace_count == 0:
-        return start_line
-
-    # Scan subsequent lines
-    for i in range(start_line, len(lines)):
+    for i in range(start_line - 1, len(lines)):
         line = lines[i]
-        
-        # Check for opening brace if we haven't found one yet
-        if not found_brace:
-            if '{' in line:
-                found_brace = True
-                brace_count += line.count('{') - line.count('}')
-            elif ';' in line:
-                # Found semicolon before any brace -> single statement block
-                return i + 1
-            # If neither { nor ; found, continue to next line (e.g. multi-line statement)
-            continue
-            
-        # We are in a braced block
         brace_count += line.count('{') - line.count('}')
-        
-        if brace_count == 0:
+        if brace_count == 0 and i > start_line - 1:
             return i + 1
-            
     return len(lines)
 
 
@@ -1004,7 +976,7 @@ def parse_code_to_blocks(code_content, language="python"):
                     'end_line': end_line,
                     'code': '\n'.join(lines[i-1:end_line])
                 })
-        elif re.match(r'^\s*for\s*\(', line, re.IGNORECASE):
+        elif re.match(r'^\s*for\s*\(', line):
             end_line = find_block_end(lines, i)
             blocks.append({
                 'type': 'for_loop',
@@ -1013,16 +985,7 @@ def parse_code_to_blocks(code_content, language="python"):
                 'end_line': end_line,
                 'code': '\n'.join(lines[i-1:end_line])
             })
-        elif re.match(r'^\s*while\s*\(', line, re.IGNORECASE):
-            end_line = find_block_end(lines, i)
-            blocks.append({
-                'type': 'while_loop',
-                'name': None,
-                'start_line': i,
-                'end_line': end_line,
-                'code': '\n'.join(lines[i-1:end_line])
-            })
-        elif re.match(r'^\s*if\s*\(', line, re.IGNORECASE):
+        elif re.match(r'^\s*if\s*\(', line):
             is_inside_block = False
             for block in blocks:
                 if block['start_line'] <= i <= block['end_line']:
@@ -1269,49 +1232,21 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
         print(f"   ⚠️  WARNING: No timeline events! Highlights will not be created!")
         return None
     
-    # CRITICAL: Remove blank lines AND comments from code for cleaner display
+    # CRITICAL: Remove blank lines from code for cleaner display
     # But we need to map original line numbers to new line numbers
-    # IMPORTANT: Strip code_content first to match what parse_code_to_blocks does!
-    original_lines = code_content.strip().split('\n')
-    
-    # Step 1: Remove comments (// and /* */) while preserving code
-    def remove_comments(line):
-        """Remove // and /* */ comments from a line"""
-        # Remove // comments (but not inside strings)
-        if '//' in line:
-            # Simple heuristic: if // is not inside quotes, remove it
-            in_string = False
-            quote_char = None
-            for i, char in enumerate(line):
-                if char in ['"', "'"] and (i == 0 or line[i-1] != '\\'):
-                    if not in_string:
-                        in_string = True
-                        quote_char = char
-                    elif char == quote_char:
-                        in_string = False
-                        quote_char = None
-                elif char == '/' and i < len(line) - 1 and line[i+1] == '/' and not in_string:
-                    # Found // outside string - remove rest of line
-                    return line[:i].rstrip()
-            return line
-        return line
-    
-    # Remove comments from all lines
-    lines_without_comments = [remove_comments(line) for line in original_lines]
-    
-    # Step 2: Remove blank lines and create mapping
+    original_lines = code_content.split('\n')
     non_blank_lines = []
     line_number_mapping = {}  # Maps original line number (1-indexed) to new line number (1-indexed)
     new_line_num = 1
     
-    for orig_line_num, line in enumerate(lines_without_comments, start=1):
+    for orig_line_num, line in enumerate(original_lines, start=1):
         if line.strip():  # Non-blank line
             non_blank_lines.append(line)
             line_number_mapping[orig_line_num] = new_line_num
             new_line_num += 1
         # Blank lines are skipped - no mapping needed
     
-    # Create cleaned code without blank lines and comments
+    # Create cleaned code without blank lines
     cleaned_code = '\n'.join(non_blank_lines)
     num_original_lines = len(original_lines)
     num_cleaned_lines = len(non_blank_lines)
@@ -1319,7 +1254,7 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
     
     print(f"🔍 DEBUG: Code cleaning:")
     print(f"   Original lines: {num_original_lines}")
-    print(f"   Blank lines + comments removed: {num_blank_lines}")
+    print(f"   Blank lines removed: {num_blank_lines}")
     print(f"   Cleaned lines: {num_cleaned_lines}")
     print(f"   Line mapping created: {len(line_number_mapping)} mappings")
     
@@ -1449,21 +1384,21 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
             line_spacing=1.0
         )
         # Calculate actual line height: total height / number of lines
-        test_num_lines = min(5, num_code_lines)
-        if test_num_lines > 0:
-            # CRITICAL: Use actual measured height from Manim Text object
-            # The text height divided by number of lines gives us the actual line height
-            actual_line_height = test_text.height / test_num_lines
-            line_height = actual_line_height
-            print(f"   🔍 Measured line_height from Text object: {line_height:.3f} (height {test_text.height:.3f} / {test_num_lines} lines)")
+        if num_code_lines > 0:
+            # Approximate: for font_size=22, line_spacing=1.0, each line is ~0.65-0.7 units
+            # But we'll use a more accurate calculation
+            # Formula: line_height ≈ (font_size / 30) * line_spacing
+            # For font_size=22, line_spacing=1.0: line_height ≈ 0.73
+            # More accurate: font_size=22, line_spacing=1.0
+            # Actual line height ≈ font_size / 32 (empirically determined)
+            line_height = (22 / 32.0) * 1.0  # ≈ 0.6875
         else:
-            line_height = 0.44  # Fallback based on empirical measurement
-    except Exception as e:
+            line_height = 0.7  # Fallback - slightly larger to ensure full coverage
+    except:
         # Fallback if Manim not available during code generation
-        # Based on empirical measurement: for font_size=22, line_spacing=1.0
-        # Actual line height ≈ 0.44 (measured from Manim Text object)
-        print(f"   ⚠️  Could not measure line_height from Manim ({e}), using fallback")
-        line_height = 0.44
+        # For font_size=22, line_spacing=1.0: line_height ≈ 0.7 (more accurate)
+        # Using 0.7 instead of 0.6 to ensure highlights cover full blocks, not just 2 lines
+        line_height = 0.7  # More accurate - ensures full block coverage
     
     print(f"🔍 DEBUG: Creating highlights for {len(timeline_events)} timeline events")
     print(f"🔍 DEBUG: Using line_height = {line_height:.3f} (calculated for font_size=22, line_spacing=1.0)")
@@ -1568,33 +1503,22 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
             new_start_line = original_start_line
             new_end_line = original_end_line
         
-        # CRITICAL FIX: Calculate positioning based on START line, not center
-        # new_start_line is 1-indexed, convert to 0-indexed for positioning
-        start_line_0indexed = new_start_line - 1
-        end_line_0indexed = new_end_line - 1
-        
-        # Calculate center line in 0-indexed coordinates
-        center_line_0indexed = (start_line_0indexed + end_line_0indexed) / 2.0
+        # Calculate center_line using NEW line numbers (in cleaned code)
+        # new_start_line and new_end_line are 1-indexed in cleaned code
+        center_line = ((new_start_line + new_end_line) / 2.0) - 1  # Convert to 0-indexed
         
         # Calculate number of lines in cleaned code
         num_lines_in_cleaned_block = new_end_line - new_start_line + 1
         
         print(f"   🔍 DEBUG: Block {event_idx}: original lines {original_start_line}-{original_end_line}")
         print(f"      → cleaned lines {new_start_line}-{new_end_line} ({num_lines_in_cleaned_block} lines)")
-        print(f"      → 0-indexed: lines {start_line_0indexed}-{end_line_0indexed}")
-        print(f"      → center_line (0-indexed): {center_line_0indexed:.2f}")
+        print(f"      center_line (0-indexed in cleaned code): {center_line:.2f}")
         print(f"      block_height: {block_height:.3f} (should cover all {num_lines_in_cleaned_block} lines)")
         print(f"      line_height used: {line_height:.3f} (for font_size=22, line_spacing=1.0)")
         
         # Build line by line with 12-space indentation (matches if/else block level)
         indent = "            "  # 12 spaces
-        # Position: top of code - (center_line * line_height) - (line_height / 2) to get to center of first line
-        # Then add (block_height / 2) to get to center of block
-        highlight_positioning += f"{indent}# Position highlight for lines {new_start_line}-{new_end_line} (0-indexed: {start_line_0indexed}-{end_line_0indexed})\n"
-        highlight_positioning += f"{indent}# Top of line {start_line_0indexed} is at: full_code.get_top()[1] - ({start_line_0indexed} * {line_height:.3f})\n"
-        highlight_positioning += f"{indent}# Center of block is at: top_of_start_line - ({block_height:.3f} / 2)\n"
-        highlight_positioning += f"{indent}block_{event_idx}_top_y = full_code.get_top()[1] - ({start_line_0indexed} * {line_height:.3f})\n"
-        highlight_positioning += f"{indent}block_{event_idx}_center_y = block_{event_idx}_top_y - ({block_height:.3f} / 2.0)\n"
+        highlight_positioning += f"{indent}block_{event_idx}_center_y = full_code.get_top()[1] - ({center_line} * {line_height:.3f})\n"
         highlight_positioning += f"{indent}highlight_{event_idx}.move_to([full_code.get_center()[0], block_{event_idx}_center_y, 0])\n"
         highlight_positioning += f"{indent}highlight_{event_idx}.stretch_to_fit_width(full_code.width + 0.3)\n"
         # CRITICAL: Ensure highlight height matches the actual block height
@@ -1656,9 +1580,6 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
         block_start_line = new_start_line
         block_end_line = new_end_line
         block_center_line = (block_start_line + block_end_line) / 2
-        # CRITICAL: Calculate center_line (0-indexed) for highlight positioning
-        # block_start_line and block_end_line are 1-indexed, so center_line = (start + end) / 2 - 1
-        center_line = ((block_start_line + block_end_line) / 2.0) - 1  # Convert to 0-indexed
         
         # Use cleaned code (without blank lines) for scroll calculation
         # Since we removed blank lines from display, use cleaned code
@@ -1762,9 +1683,7 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
                 seg_target_y = start_center_y + (scroll_distance * {scroll_progress:.3f})
                 # CRITICAL: Update highlight positions relative to new code position after scroll
                 code_top_y = seg_target_y + (full_code.height / 2)
-                # Position highlight: top at first line, center based on height
-                block_{event_idx}_top_y = code_top_y - ({start_line_0indexed} * {line_height:.3f})
-                block_{event_idx}_center_y = block_{event_idx}_top_y - ({block_height:.3f} / 2.0)
+                block_{event_idx}_center_y = code_top_y - ({center_line} * {line_height:.3f})
                 highlight_{event_idx}.move_to([code_center_x, block_{event_idx}_center_y, 0])
                 highlight_glow_{event_idx}.move_to([code_center_x, block_{event_idx}_center_y, 0])
                 self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
@@ -1772,9 +1691,7 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
                 # No scrolling - highlights are already positioned correctly in highlight_positioning
                 # Just ensure they're at the right position relative to current code position
                 code_top_y = full_code.get_top()[1]
-                # Position highlight: top at first line, center based on height
-                block_{event_idx}_top_y = code_top_y - ({start_line_0indexed} * {line_height:.3f})
-                block_{event_idx}_center_y = block_{event_idx}_top_y - ({block_height:.3f} / 2.0)
+                block_{event_idx}_center_y = code_top_y - ({center_line} * {line_height:.3f})
                 highlight_{event_idx}.move_to([full_code.get_center()[0], block_{event_idx}_center_y, 0])
                 highlight_glow_{event_idx}.move_to([full_code.get_center()[0], block_{event_idx}_center_y, 0])
             
@@ -2226,14 +2143,6 @@ def code_to_video(code_content: str, output_name: str = "output", audio_language
                             print(f"   🔍 {block['type']} (lines {block['start_line']}-{block['end_line']}) CONTAINS {other_block['type']} (lines {other_block['start_line']}-{other_block['end_line']})")
                 
                 if contains_other_blocks:
-                    # Special rule: If it's a loop and contains only conditionals/statements (no inner loops), highlight it
-                    if 'loop' in block['type']:
-                        has_inner_loop = any('loop' in b['type'] for b in contained_blocks)
-                        if not has_inner_loop:
-                            blocks_for_highlights.append(block)
-                            print(f"   ✅ {block['type']} (contains non-loop blocks): NARRATION ✅, HIGHLIGHT ✅ (loop preference)")
-                            continue
-
                     # This block contains other blocks → DON'T highlight it
                     # Its children will be highlighted instead
                     print(f"   ❌ {block['type']} (lines {block['start_line']}-{block['end_line']}): NARRATION ✅, HIGHLIGHT ❌ (contains {len(contained_blocks)} other blocks)")
