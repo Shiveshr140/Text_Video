@@ -1,24 +1,13 @@
 #!/usr/bin/env python3
 """
-Test Code to Video
-==================
-
-Testing the code_to_video function with sample Python code
-
-IMPORTANT: Use Python 3.11 with Whisper installed!
-Run: source venv311/bin/activate && python code_video_java.py
-Or: ./run_code_video.sh
+Test scrolling with Java pyramid code
 """
 
 from simple_app import code_to_video
 
 if __name__ == "__main__":
-    print("\n" + "💻"*30)
-    print("CODE TO VIDEO TEST")
-    print("💻"*30 + "\n")
-    
     sample_code = """
-   // Java Program to Print the Pyramid pattern
+// Java Program to Print the Pyramid pattern
 
 // Main class
 public class GFG {
@@ -60,31 +49,15 @@ public class GFG {
         }
     }
 }
-
 """
-    
-    print("This will create:")
-    print("  ✅ Code displayed on screen")
-    print("  ✅ Audio explaining the code")
-    print("  ✅ Synchronized video")
-    print("  ✅ Professional code explanation")
-    print("\n" + "="*70 + "\n")
     
     result = code_to_video(
         code_content=sample_code,
-        output_name="pyramid_code_explanation",
+        output_name="test_scroll_pyramid",
         audio_language="english"
     )
     
     if result:
-        print(f"\n{'🎉'*30}")
-        print(f"✅ VIDEO READY: {result['final_video']}")
-        print(f"{'🎉'*30}\n")
-        print("\n🎯 This video has:")
-        print("  1. Code displayed clearly on screen")
-        print("  2. Audio explaining each part")
-        print("  3. Synchronized code and narration")
-        print("  4. Professional code explanation!")
+        print(f"\n✅ VIDEO READY: {result['final_video']}")
     else:
         print("\n❌ Failed to create video")
-

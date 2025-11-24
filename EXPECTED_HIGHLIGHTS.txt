@@ -1,0 +1,48 @@
+EXPECTED HIGHLIGHT POSITIONS IN THE VIDEO
+==========================================
+
+The code displayed in the video (after cleaning):
+
+Line 1:  public class GFG {
+Line 2:      public static void main(String[] args)
+Line 3:      {
+Line 4:          int num = 5;
+Line 5:          int x = 0;
+Line 6:          for (int i = 1; i <= num; i++) {
+Line 7:              x = i - 1;
+Line 8:  ┌───────► for (int j = i; j <= num - 1; j++) {    ◄─── HIGHLIGHT 1 STARTS HERE
+Line 9:  │            System.out.print(" ");
+Line 10: │            System.out.print("  ");
+Line 11: └───────► }                                       ◄─── HIGHLIGHT 1 ENDS HERE
+Line 12: ┌───────► for (int j = 0; j <= x; j++)            ◄─── HIGHLIGHT 2 STARTS HERE
+Line 13: │            System.out.print((i + j) < 10
+Line 14: │                                 ? (i + j) + "  "
+Line 15: └───────►                         : (i + j) + " "); ◄─── HIGHLIGHT 2 ENDS HERE
+Line 16: ┌───────► for (int j = 1; j <= x; j++)            ◄─── HIGHLIGHT 3 STARTS HERE
+Line 17: │            System.out.print((i + x - j) < 10
+Line 18: │                                 ? (i + x - j) + "  "
+Line 19: └───────►                         : (i + x - j) + " "); ◄─── HIGHLIGHT 3 ENDS HERE
+Line 20:             System.out.println();
+Line 21:         }
+Line 22:     }
+Line 23: }
+
+WHAT TO CHECK:
+==============
+✅ Highlight 1 should cover lines 8-11 (the first inner for loop)
+✅ Highlight 2 should cover lines 12-15 (the second for loop)
+✅ Highlight 3 should cover lines 16-19 (the third for loop)
+
+Each highlight should:
+- Start EXACTLY at the "for" keyword line
+- End EXACTLY at the closing brace/semicolon
+- NOT be one line above or below
+- Cover the entire block height
+
+FIXES APPLIED:
+==============
+1. ✅ Comments removed before parsing
+2. ✅ Blank lines removed before parsing
+3. ✅ Each event uses its own line number (not reusing last event's number)
+4. ✅ Off-by-one error fixed (+ 0.5 offset for line center)
+5. ✅ Both initial and scrolling positions use correct formula

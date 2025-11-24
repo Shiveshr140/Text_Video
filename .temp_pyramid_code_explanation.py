@@ -9,29 +9,28 @@ class CodeExplanationScene(Scene):
         self.wait(1)
         
         full_code = Text(
-            """public class GFG {
-    public static void main(String[] args)
-    {
-        int num = 5;
-        int x = 0;
-        for (int i = 1; i <= num; i++) {
-            x = i - 1;
-            for (int j = i; j <= num - 1; j++) {
-                System.out.print(\" \");
-                System.out.print(\"  \");
-            }
-            for (int j = 0; j <= x; j++)
-                System.out.print((i + j) < 10
-                                     ? (i + j) + \"  \"
-                                     : (i + j) + \" \");
-            for (int j = 1; j <= x; j++)
-                System.out.print((i + x - j) < 10
-                                     ? (i + x - j) + \"  \"
-                                     : (i + x - j) + \" \");
-            System.out.println();
+            """function areAnagrams(str1, str2) {
+    if (str1.length !== str2.length) {
+        return false; 
+    }
+    let count1 = {};
+    let count2 = {};
+    for (let i = 0; i < str1.length; i++) {
+        let char = str1[i];
+        count1[char] = (count1[char] || 0) + 1;
+    }
+    for (let i = 0; i < str2.length; i++) {
+        let char = str2[i];
+        count2[char] = (count2[char] || 0) + 1;
+    }
+    for (let char in count1) {
+        if (count1[char] !== count2[char]) {
+            return false; 
         }
     }
-}""",
+    return true; 
+}
+console.log(areAnagrams(\"listen\", \"silent\"));""",
             font_size=22,
             font="Courier",
             color=WHITE,
@@ -43,11 +42,11 @@ class CodeExplanationScene(Scene):
         
         full_code.to_edge(LEFT, buff=0.5)
         
-        # Highlight rectangle for block: lines 17-24 (4 lines)
-        # Block height calculation: 4 lines × 0.421 line_height = 1.683
+        # Highlight rectangle for block: lines 7-10 (4 lines)
+        # Block height calculation: 4 lines × 0.424 line_height = 1.695
         highlight_0 = Rectangle(
             width=12,
-            height=1.683,
+            height=1.695,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=3,
@@ -59,18 +58,18 @@ class CodeExplanationScene(Scene):
         # Add glow effect (slightly larger, semi-transparent)
         highlight_glow_0 = Rectangle(
             width=12.4,
-            height=1.783,
+            height=1.795,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=5,
             stroke_color="#4A90E2",
             stroke_opacity=0.0
         )
-        # Highlight rectangle for block: lines 27-30 (4 lines)
-        # Block height calculation: 4 lines × 0.421 line_height = 1.683
+        # Highlight rectangle for block: lines 11-14 (4 lines)
+        # Block height calculation: 4 lines × 0.424 line_height = 1.695
         highlight_1 = Rectangle(
             width=12,
-            height=1.683,
+            height=1.695,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=3,
@@ -82,30 +81,30 @@ class CodeExplanationScene(Scene):
         # Add glow effect (slightly larger, semi-transparent)
         highlight_glow_1 = Rectangle(
             width=12.4,
-            height=1.783,
+            height=1.795,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=5,
             stroke_color="#4A90E2",
             stroke_opacity=0.0
         )
-        # Highlight rectangle for block: lines 32-35 (4 lines)
-        # Block height calculation: 4 lines × 0.421 line_height = 1.683
+        # Highlight rectangle for block: lines 15-19 (5 lines)
+        # Block height calculation: 5 lines × 0.424 line_height = 2.119
         highlight_2 = Rectangle(
             width=12,
-            height=1.683,
+            height=2.119,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=3,
             stroke_color="#4A90E2",
             stroke_opacity=0.0
         )
-        # CRITICAL: Verify highlight height covers all 4 lines
+        # CRITICAL: Verify highlight height covers all 5 lines
         # If highlight appears too small, increase line_height or block_height
         # Add glow effect (slightly larger, semi-transparent)
         highlight_glow_2 = Rectangle(
             width=12.4,
-            height=1.783,
+            height=2.219,
             fill_opacity=0.0,
             fill_color="#4A90E2",
             stroke_width=5,
@@ -124,14 +123,14 @@ class CodeExplanationScene(Scene):
             end_center_y = -3.5 + (code_height / 2)
             scroll_distance = end_center_y - start_center_y
             
-            # Position highlight for lines 8-11 (0-indexed: 7-10)
-            # Top of line 7 is at: full_code.get_top()[1] - (7 * 0.421)
-            # Center of block is at: top_of_start_line - (1.683 / 2)
-            block_0_top_y = full_code.get_top()[1] - (7 * 0.421)
-            block_0_center_y = block_0_top_y - (1.683 / 2.0)
+            # Position highlight for lines 7-10 (0-indexed: 6-9)
+            # Positioning at display line 7: full_code.get_top()[1] - (7 * 0.424)
+            # Center of block is at: center_of_start_line - ((5 - 1) * 0.424 / 2)
+            block_0_start_line_center_y = full_code.get_top()[1] - (7 * 0.424)
+            block_0_center_y = block_0_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
             highlight_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
             highlight_0.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 1.683 (for 4 lines)
+            # Highlight height: 2.119 (for 5 lines)
             highlight_0.set_z_index(-1)
             highlight_0.set_opacity(0)
             highlight_0.set_stroke_opacity(0)
@@ -140,14 +139,14 @@ class CodeExplanationScene(Scene):
             highlight_glow_0.set_z_index(-2)
             highlight_glow_0.set_opacity(0)
             highlight_glow_0.set_stroke_opacity(0)
-            # Position highlight for lines 12-15 (0-indexed: 11-14)
-            # Top of line 11 is at: full_code.get_top()[1] - (11 * 0.421)
-            # Center of block is at: top_of_start_line - (1.683 / 2)
-            block_1_top_y = full_code.get_top()[1] - (11 * 0.421)
-            block_1_center_y = block_1_top_y - (1.683 / 2.0)
+            # Position highlight for lines 11-14 (0-indexed: 10-13)
+            # Positioning at display line 11: full_code.get_top()[1] - (11 * 0.424)
+            # Center of block is at: center_of_start_line - ((5 - 1) * 0.424 / 2)
+            block_1_start_line_center_y = full_code.get_top()[1] - (11 * 0.424)
+            block_1_center_y = block_1_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
             highlight_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
             highlight_1.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 1.683 (for 4 lines)
+            # Highlight height: 2.119 (for 5 lines)
             highlight_1.set_z_index(-1)
             highlight_1.set_opacity(0)
             highlight_1.set_stroke_opacity(0)
@@ -156,14 +155,14 @@ class CodeExplanationScene(Scene):
             highlight_glow_1.set_z_index(-2)
             highlight_glow_1.set_opacity(0)
             highlight_glow_1.set_stroke_opacity(0)
-            # Position highlight for lines 16-19 (0-indexed: 15-18)
-            # Top of line 15 is at: full_code.get_top()[1] - (15 * 0.421)
-            # Center of block is at: top_of_start_line - (1.683 / 2)
-            block_2_top_y = full_code.get_top()[1] - (15 * 0.421)
-            block_2_center_y = block_2_top_y - (1.683 / 2.0)
+            # Position highlight for lines 15-19 (0-indexed: 14-18)
+            # Positioning at display line 15: full_code.get_top()[1] - (15 * 0.424)
+            # Center of block is at: center_of_start_line - ((5 - 1) * 0.424 / 2)
+            block_2_start_line_center_y = full_code.get_top()[1] - (15 * 0.424)
+            block_2_center_y = block_2_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
             highlight_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
             highlight_2.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 1.683 (for 4 lines)
+            # Highlight height: 2.119 (for 5 lines)
             highlight_2.set_z_index(-1)
             highlight_2.set_opacity(0)
             highlight_2.set_stroke_opacity(0)
@@ -179,26 +178,26 @@ class CodeExplanationScene(Scene):
             self.add(all_highlights)
             self.play(FadeIn(full_code), run_time=0.5)
             
-            self.wait(109.11)
-            # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
-            if 198.09 > 0 and scroll_distance > 0:
+            self.wait(30.17)
+            # Scroll only if needed (scroll_progress > 0 means actual scrolling)
+            scroll_time = 0.3 if 0.000 > 0 and scroll_distance > 0 else 0.0
+            if 0.000 > 0 and scroll_distance > 0:
                 seg_target_y = start_center_y + (scroll_distance * 0.000)
-                # CRITICAL: Update highlight positions relative to new code position after scroll
-                code_top_y = seg_target_y + (full_code.height / 2)
-                # Position highlight: top at first line, center based on height
-                block_0_top_y = code_top_y - (15 * 0.421)
-                block_0_center_y = block_0_top_y - (1.683 / 2.0)
+                # CRITICAL: Scroll FIRST, then get the actual top position
+                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
+                # Now get the ACTUAL top position after scroll
+                code_top_y = full_code.get_top()[1]
+                # Position highlight: use (N + 0.5) for scrolling case
+                # (N+1 was 1 line below, N was 2 lines above, so N+0.5 should be perfect)
+                block_0_start_line_center_y = code_top_y - (6.5 * 0.424)
+                block_0_center_y = block_0_start_line_center_y - ((4 - 1) * 0.424 / 2.0)
                 highlight_0.move_to([code_center_x, block_0_center_y, 0])
                 highlight_glow_0.move_to([code_center_x, block_0_center_y, 0])
-                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
             else:
-                # No scrolling - highlights are already positioned correctly in highlight_positioning
-                # Just ensure they're at the right position relative to current code position
+                # No scrolling - use N+1 (Confirmed correct for Loop 1)
                 code_top_y = full_code.get_top()[1]
-                # Position highlight: top at first line, center based on height
-                block_0_top_y = code_top_y - (15 * 0.421)
-                block_0_center_y = block_0_top_y - (1.683 / 2.0)
+                block_0_start_line_center_y = code_top_y - (7 * 0.424)
+                block_0_center_y = block_0_start_line_center_y - ((4 - 1) * 0.424 / 2.0)
                 highlight_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
                 highlight_glow_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
             
@@ -231,7 +230,7 @@ class CodeExplanationScene(Scene):
                 highlight_glow_0.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 27.82 - scroll_time - 1.1
+            remaining_time = 24.00 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             # Fade out previous highlight
@@ -240,25 +239,25 @@ class CodeExplanationScene(Scene):
                 highlight_glow_0.animate.set_opacity(0).set_stroke_opacity(0),
                 run_time=0.3
             )
-            # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
-            if 198.09 > 0 and scroll_distance > 0:
-                seg_target_y = start_center_y + (scroll_distance * 0.700)
-                # CRITICAL: Update highlight positions relative to new code position after scroll
-                code_top_y = seg_target_y + (full_code.height / 2)
-                # Position highlight: top at first line, center based on height
-                block_1_top_y = code_top_y - (15 * 0.421)
-                block_1_center_y = block_1_top_y - (1.683 / 2.0)
+            # Scroll only if needed (scroll_progress > 0 means actual scrolling)
+            scroll_time = 0.3 if 0.625 > 0 and scroll_distance > 0 else 0.0
+            if 0.625 > 0 and scroll_distance > 0:
+                seg_target_y = start_center_y + (scroll_distance * 0.625)
+                # CRITICAL: Scroll FIRST, then get the actual top position
+                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
+                # Now get the ACTUAL top position after scroll
+                code_top_y = full_code.get_top()[1]
+                # Position highlight: use (N + 0.5) for scrolling case
+                # (N+1 was 1 line below, N was 2 lines above, so N+0.5 should be perfect)
+                block_1_start_line_center_y = code_top_y - (10.5 * 0.424)
+                block_1_center_y = block_1_start_line_center_y - ((4 - 1) * 0.424 / 2.0)
                 highlight_1.move_to([code_center_x, block_1_center_y, 0])
                 highlight_glow_1.move_to([code_center_x, block_1_center_y, 0])
-                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
             else:
-                # No scrolling - highlights are already positioned correctly in highlight_positioning
-                # Just ensure they're at the right position relative to current code position
+                # No scrolling - use N+1 (Confirmed correct for Loop 1)
                 code_top_y = full_code.get_top()[1]
-                # Position highlight: top at first line, center based on height
-                block_1_top_y = code_top_y - (15 * 0.421)
-                block_1_center_y = block_1_top_y - (1.683 / 2.0)
+                block_1_start_line_center_y = code_top_y - (11 * 0.424)
+                block_1_center_y = block_1_start_line_center_y - ((4 - 1) * 0.424 / 2.0)
                 highlight_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
                 highlight_glow_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
             
@@ -291,7 +290,7 @@ class CodeExplanationScene(Scene):
                 highlight_glow_1.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 28.24 - scroll_time - 1.1
+            remaining_time = 25.63 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             # Fade out previous highlight
@@ -300,25 +299,25 @@ class CodeExplanationScene(Scene):
                 highlight_glow_1.animate.set_opacity(0).set_stroke_opacity(0),
                 run_time=0.3
             )
-            # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
-            if 198.09 > 0 and scroll_distance > 0:
+            # Scroll only if needed (scroll_progress > 0 means actual scrolling)
+            scroll_time = 0.3 if 1.000 > 0 and scroll_distance > 0 else 0.0
+            if 1.000 > 0 and scroll_distance > 0:
                 seg_target_y = start_center_y + (scroll_distance * 1.000)
-                # CRITICAL: Update highlight positions relative to new code position after scroll
-                code_top_y = seg_target_y + (full_code.height / 2)
-                # Position highlight: top at first line, center based on height
-                block_2_top_y = code_top_y - (15 * 0.421)
-                block_2_center_y = block_2_top_y - (1.683 / 2.0)
+                # CRITICAL: Scroll FIRST, then get the actual top position
+                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
+                # Now get the ACTUAL top position after scroll
+                code_top_y = full_code.get_top()[1]
+                # Position highlight: use (N + 0.5) for scrolling case
+                # (N+1 was 1 line below, N was 2 lines above, so N+0.5 should be perfect)
+                block_2_start_line_center_y = code_top_y - (14.5 * 0.424)
+                block_2_center_y = block_2_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
                 highlight_2.move_to([code_center_x, block_2_center_y, 0])
                 highlight_glow_2.move_to([code_center_x, block_2_center_y, 0])
-                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
             else:
-                # No scrolling - highlights are already positioned correctly in highlight_positioning
-                # Just ensure they're at the right position relative to current code position
+                # No scrolling - use N+1 (Confirmed correct for Loop 1)
                 code_top_y = full_code.get_top()[1]
-                # Position highlight: top at first line, center based on height
-                block_2_top_y = code_top_y - (15 * 0.421)
-                block_2_center_y = block_2_top_y - (1.683 / 2.0)
+                block_2_start_line_center_y = code_top_y - (15 * 0.424)
+                block_2_center_y = block_2_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
                 highlight_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
                 highlight_glow_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
             
@@ -351,7 +350,7 @@ class CodeExplanationScene(Scene):
                 highlight_glow_2.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 32.91 - scroll_time - 1.1
+            remaining_time = 23.90 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             self.play(highlight_2.animate.set_opacity(0), run_time=0.2)
@@ -367,14 +366,14 @@ class CodeExplanationScene(Scene):
             
             # Position highlights even when code doesn't scroll
             
-            # Position highlight for lines 8-11 (0-indexed: 7-10)
-            # Top of line 7 is at: full_code.get_top()[1] - (7 * 0.421)
-            # Center of block is at: top_of_start_line - (1.683 / 2)
-            block_0_top_y = full_code.get_top()[1] - (7 * 0.421)
-            block_0_center_y = block_0_top_y - (1.683 / 2.0)
+            # Position highlight for lines 7-10 (0-indexed: 6-9)
+            # Positioning at display line 7: full_code.get_top()[1] - (7 * 0.424)
+            # Center of block is at: center_of_start_line - ((5 - 1) * 0.424 / 2)
+            block_0_start_line_center_y = full_code.get_top()[1] - (7 * 0.424)
+            block_0_center_y = block_0_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
             highlight_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
             highlight_0.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 1.683 (for 4 lines)
+            # Highlight height: 2.119 (for 5 lines)
             highlight_0.set_z_index(-1)
             highlight_0.set_opacity(0)
             highlight_0.set_stroke_opacity(0)
@@ -383,14 +382,14 @@ class CodeExplanationScene(Scene):
             highlight_glow_0.set_z_index(-2)
             highlight_glow_0.set_opacity(0)
             highlight_glow_0.set_stroke_opacity(0)
-            # Position highlight for lines 12-15 (0-indexed: 11-14)
-            # Top of line 11 is at: full_code.get_top()[1] - (11 * 0.421)
-            # Center of block is at: top_of_start_line - (1.683 / 2)
-            block_1_top_y = full_code.get_top()[1] - (11 * 0.421)
-            block_1_center_y = block_1_top_y - (1.683 / 2.0)
+            # Position highlight for lines 11-14 (0-indexed: 10-13)
+            # Positioning at display line 11: full_code.get_top()[1] - (11 * 0.424)
+            # Center of block is at: center_of_start_line - ((5 - 1) * 0.424 / 2)
+            block_1_start_line_center_y = full_code.get_top()[1] - (11 * 0.424)
+            block_1_center_y = block_1_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
             highlight_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
             highlight_1.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 1.683 (for 4 lines)
+            # Highlight height: 2.119 (for 5 lines)
             highlight_1.set_z_index(-1)
             highlight_1.set_opacity(0)
             highlight_1.set_stroke_opacity(0)
@@ -399,14 +398,14 @@ class CodeExplanationScene(Scene):
             highlight_glow_1.set_z_index(-2)
             highlight_glow_1.set_opacity(0)
             highlight_glow_1.set_stroke_opacity(0)
-            # Position highlight for lines 16-19 (0-indexed: 15-18)
-            # Top of line 15 is at: full_code.get_top()[1] - (15 * 0.421)
-            # Center of block is at: top_of_start_line - (1.683 / 2)
-            block_2_top_y = full_code.get_top()[1] - (15 * 0.421)
-            block_2_center_y = block_2_top_y - (1.683 / 2.0)
+            # Position highlight for lines 15-19 (0-indexed: 14-18)
+            # Positioning at display line 15: full_code.get_top()[1] - (15 * 0.424)
+            # Center of block is at: center_of_start_line - ((5 - 1) * 0.424 / 2)
+            block_2_start_line_center_y = full_code.get_top()[1] - (15 * 0.424)
+            block_2_center_y = block_2_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
             highlight_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
             highlight_2.stretch_to_fit_width(full_code.width + 0.3)
-            # Highlight height: 1.683 (for 4 lines)
+            # Highlight height: 2.119 (for 5 lines)
             highlight_2.set_z_index(-1)
             highlight_2.set_opacity(0)
             highlight_2.set_stroke_opacity(0)
@@ -425,26 +424,26 @@ class CodeExplanationScene(Scene):
             
             # Run animation timeline for highlights (even without scrolling)
             
-            self.wait(109.11)
-            # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
-            if 198.09 > 0 and scroll_distance > 0:
+            self.wait(30.17)
+            # Scroll only if needed (scroll_progress > 0 means actual scrolling)
+            scroll_time = 0.3 if 0.000 > 0 and scroll_distance > 0 else 0.0
+            if 0.000 > 0 and scroll_distance > 0:
                 seg_target_y = start_center_y + (scroll_distance * 0.000)
-                # CRITICAL: Update highlight positions relative to new code position after scroll
-                code_top_y = seg_target_y + (full_code.height / 2)
-                # Position highlight: top at first line, center based on height
-                block_0_top_y = code_top_y - (15 * 0.421)
-                block_0_center_y = block_0_top_y - (1.683 / 2.0)
+                # CRITICAL: Scroll FIRST, then get the actual top position
+                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
+                # Now get the ACTUAL top position after scroll
+                code_top_y = full_code.get_top()[1]
+                # Position highlight: use (N + 0.5) for scrolling case
+                # (N+1 was 1 line below, N was 2 lines above, so N+0.5 should be perfect)
+                block_0_start_line_center_y = code_top_y - (6.5 * 0.424)
+                block_0_center_y = block_0_start_line_center_y - ((4 - 1) * 0.424 / 2.0)
                 highlight_0.move_to([code_center_x, block_0_center_y, 0])
                 highlight_glow_0.move_to([code_center_x, block_0_center_y, 0])
-                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
             else:
-                # No scrolling - highlights are already positioned correctly in highlight_positioning
-                # Just ensure they're at the right position relative to current code position
+                # No scrolling - use N+1 (Confirmed correct for Loop 1)
                 code_top_y = full_code.get_top()[1]
-                # Position highlight: top at first line, center based on height
-                block_0_top_y = code_top_y - (15 * 0.421)
-                block_0_center_y = block_0_top_y - (1.683 / 2.0)
+                block_0_start_line_center_y = code_top_y - (7 * 0.424)
+                block_0_center_y = block_0_start_line_center_y - ((4 - 1) * 0.424 / 2.0)
                 highlight_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
                 highlight_glow_0.move_to([full_code.get_center()[0], block_0_center_y, 0])
             
@@ -477,7 +476,7 @@ class CodeExplanationScene(Scene):
                 highlight_glow_0.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 27.82 - scroll_time - 1.1
+            remaining_time = 24.00 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             # Fade out previous highlight
@@ -486,25 +485,25 @@ class CodeExplanationScene(Scene):
                 highlight_glow_0.animate.set_opacity(0).set_stroke_opacity(0),
                 run_time=0.3
             )
-            # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
-            if 198.09 > 0 and scroll_distance > 0:
-                seg_target_y = start_center_y + (scroll_distance * 0.700)
-                # CRITICAL: Update highlight positions relative to new code position after scroll
-                code_top_y = seg_target_y + (full_code.height / 2)
-                # Position highlight: top at first line, center based on height
-                block_1_top_y = code_top_y - (15 * 0.421)
-                block_1_center_y = block_1_top_y - (1.683 / 2.0)
+            # Scroll only if needed (scroll_progress > 0 means actual scrolling)
+            scroll_time = 0.3 if 0.625 > 0 and scroll_distance > 0 else 0.0
+            if 0.625 > 0 and scroll_distance > 0:
+                seg_target_y = start_center_y + (scroll_distance * 0.625)
+                # CRITICAL: Scroll FIRST, then get the actual top position
+                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
+                # Now get the ACTUAL top position after scroll
+                code_top_y = full_code.get_top()[1]
+                # Position highlight: use (N + 0.5) for scrolling case
+                # (N+1 was 1 line below, N was 2 lines above, so N+0.5 should be perfect)
+                block_1_start_line_center_y = code_top_y - (10.5 * 0.424)
+                block_1_center_y = block_1_start_line_center_y - ((4 - 1) * 0.424 / 2.0)
                 highlight_1.move_to([code_center_x, block_1_center_y, 0])
                 highlight_glow_1.move_to([code_center_x, block_1_center_y, 0])
-                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
             else:
-                # No scrolling - highlights are already positioned correctly in highlight_positioning
-                # Just ensure they're at the right position relative to current code position
+                # No scrolling - use N+1 (Confirmed correct for Loop 1)
                 code_top_y = full_code.get_top()[1]
-                # Position highlight: top at first line, center based on height
-                block_1_top_y = code_top_y - (15 * 0.421)
-                block_1_center_y = block_1_top_y - (1.683 / 2.0)
+                block_1_start_line_center_y = code_top_y - (11 * 0.424)
+                block_1_center_y = block_1_start_line_center_y - ((4 - 1) * 0.424 / 2.0)
                 highlight_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
                 highlight_glow_1.move_to([full_code.get_center()[0], block_1_center_y, 0])
             
@@ -537,7 +536,7 @@ class CodeExplanationScene(Scene):
                 highlight_glow_1.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 28.24 - scroll_time - 1.1
+            remaining_time = 25.63 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             # Fade out previous highlight
@@ -546,25 +545,25 @@ class CodeExplanationScene(Scene):
                 highlight_glow_1.animate.set_opacity(0).set_stroke_opacity(0),
                 run_time=0.3
             )
-            # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if 198.09 > 0 and scroll_distance > 0 else 0.0
-            if 198.09 > 0 and scroll_distance > 0:
+            # Scroll only if needed (scroll_progress > 0 means actual scrolling)
+            scroll_time = 0.3 if 1.000 > 0 and scroll_distance > 0 else 0.0
+            if 1.000 > 0 and scroll_distance > 0:
                 seg_target_y = start_center_y + (scroll_distance * 1.000)
-                # CRITICAL: Update highlight positions relative to new code position after scroll
-                code_top_y = seg_target_y + (full_code.height / 2)
-                # Position highlight: top at first line, center based on height
-                block_2_top_y = code_top_y - (15 * 0.421)
-                block_2_center_y = block_2_top_y - (1.683 / 2.0)
+                # CRITICAL: Scroll FIRST, then get the actual top position
+                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
+                # Now get the ACTUAL top position after scroll
+                code_top_y = full_code.get_top()[1]
+                # Position highlight: use (N + 0.5) for scrolling case
+                # (N+1 was 1 line below, N was 2 lines above, so N+0.5 should be perfect)
+                block_2_start_line_center_y = code_top_y - (14.5 * 0.424)
+                block_2_center_y = block_2_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
                 highlight_2.move_to([code_center_x, block_2_center_y, 0])
                 highlight_glow_2.move_to([code_center_x, block_2_center_y, 0])
-                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
             else:
-                # No scrolling - highlights are already positioned correctly in highlight_positioning
-                # Just ensure they're at the right position relative to current code position
+                # No scrolling - use N+1 (Confirmed correct for Loop 1)
                 code_top_y = full_code.get_top()[1]
-                # Position highlight: top at first line, center based on height
-                block_2_top_y = code_top_y - (15 * 0.421)
-                block_2_center_y = block_2_top_y - (1.683 / 2.0)
+                block_2_start_line_center_y = code_top_y - (15 * 0.424)
+                block_2_center_y = block_2_start_line_center_y - ((5 - 1) * 0.424 / 2.0)
                 highlight_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
                 highlight_glow_2.move_to([full_code.get_center()[0], block_2_center_y, 0])
             
@@ -597,7 +596,7 @@ class CodeExplanationScene(Scene):
                 highlight_glow_2.animate.set_stroke_opacity(0.45),
                 run_time=0.2
             )
-            remaining_time = 32.91 - scroll_time - 1.1
+            remaining_time = 23.90 - scroll_time - 1.1
             if remaining_time > 0:
                 self.wait(remaining_time)
             self.play(highlight_2.animate.set_opacity(0), run_time=0.2)
@@ -612,14 +611,14 @@ class CodeExplanationScene(Scene):
 
         concepts_title = Text("Key Concepts", font_size=38, font="Helvetica", weight=BOLD, color=BLUE)
         concepts_title.to_edge(UP, buff=0.4)
-        concept_items = VGroup(*[Text(f"• {concept}", font_size=24, font="Helvetica", color=WHITE) for concept in ["Pyramid pattern using numbers", "Nested loops for spacing and number printing", "Alignment of numbers with spaces", "Symmetrical pattern with ascending and descending numbers", "Main method in a Java program"]])
+        concept_items = VGroup(*[Text(f"• {concept}", font_size=24, font="Helvetica", color=WHITE) for concept in ["Anagram determination", "String length comparison", "Character frequency count", "Object iteration for comparison", "Discrepancy check in frequency counts"]])
         concept_items.arrange(DOWN, aligned_edge=LEFT, buff=0.4)
         concept_items.next_to(concepts_title, DOWN, buff=0.6)
         concept_items.to_edge(LEFT, buff=0.8)
         self.play(Write(concepts_title), run_time=0.5)
         self.wait(0.3)
         self.play(Write(concept_items), run_time=1.0)
-        self.wait(14.244489387755106)
+        self.wait(9.596008718820865)
 
         
         # Ensure video duration matches audio duration

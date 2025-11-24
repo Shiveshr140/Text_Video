@@ -14,7 +14,7 @@ import sys
 import subprocess
 import re
 import openai
-from pipeline import AudioGenerator
+# Removed: from pipeline import AudioGenerator (unused)
 import json
 import wave
 import contextlib
@@ -100,6 +100,97 @@ def get_audio_duration(audio_file):
     except Exception as e:
         print(f"⚠️  Could not get audio duration: {e}")
         return None
+
+
+# ============================================================
+# HELPER: Generate SRT Subtitles from Audio
+# ============================================================
+
+def generate_srt_from_audio(audio_file, output_srt_file):
+    """
+    Generate SRT subtitle file from audio using Whisper
+    
+    Args:
+        audio_file: Path to audio file
+        output_srt_file: Path to output SRT file
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        import whisper
+        
+        print("🎬 Generating subtitles with Whisper...")
+        
+        # Load Whisper model
+        model = whisper.load_model("base")
+        
+        # Transcribe with word timestamps
+        result = model.transcribe(
+            audio_file,
+            word_timestamps=True,
+            language="en"
+        )
+        
+        # Generate SRT content
+        srt_content = []
+        subtitle_index = 1
+        
+        # Group words into subtitle chunks (5-10 words per subtitle)
+        words_per_subtitle = 7
+        all_words = []
+        
+        for segment in result.get("segments", []):
+            for word_info in segment.get("words", []):
+                all_words.append({
+                    "word": word_info.get("word", "").strip(),
+                    "start": word_info.get("start", 0),
+                    "end": word_info.get("end", 0)
+                })
+        
+        # Create subtitle chunks
+        for i in range(0, len(all_words), words_per_subtitle):
+            chunk = all_words[i:i + words_per_subtitle]
+            if not chunk:
+                continue
+            
+            # Get start and end times
+            start_time = chunk[0]["start"]
+            end_time = chunk[-1]["end"]
+            
+            # Format times as SRT format (HH:MM:SS,mmm)
+            def format_srt_time(seconds):
+                hours = int(seconds // 3600)
+                minutes = int((seconds % 3600) // 60)
+                secs = int(seconds % 60)
+                millis = int((seconds % 1) * 1000)
+                return f"{hours:02d}:{minutes:02d}:{secs:02d},{millis:03d}"
+            
+            # Build subtitle text
+            subtitle_text = " ".join([w["word"] for w in chunk])
+            
+            # Add to SRT content
+            srt_content.append(f"{subtitle_index}")
+            srt_content.append(f"{format_srt_time(start_time)} --> {format_srt_time(end_time)}")
+            srt_content.append(subtitle_text)
+            srt_content.append("")  # Blank line between subtitles
+            
+            subtitle_index += 1
+        
+        # Write SRT file
+        with open(output_srt_file, 'w', encoding='utf-8') as f:
+            f.write('\n'.join(srt_content))
+        
+        print(f"✅ Subtitles generated: {output_srt_file} ({subtitle_index - 1} subtitles)\n")
+        return True
+        
+    except ImportError:
+        print("⚠️  Whisper not installed. Skipping subtitle generation.")
+        print("   Install: pip install openai-whisper\n")
+        return False
+    except Exception as e:
+        print(f"⚠️  Subtitle generation failed: {e}\n")
+        return False
 
 
 # ============================================================
@@ -1038,6 +1129,15 @@ def parse_code_to_blocks(code_content, language="python"):
                     'end_line': end_line,
                     'code': '\n'.join(lines[i-1:end_line])
                 })
+        elif re.match(r'^\s*switch\s*\(', line, re.IGNORECASE):
+            end_line = find_block_end(lines, i)
+            blocks.append({
+                'type': 'switch_statement',
+                'name': None,
+                'start_line': i,
+                'end_line': end_line,
+                'code': '\n'.join(lines[i-1:end_line])
+            })
     
     blocks.sort(key=lambda x: x['start_line'])
     return blocks
@@ -1256,14 +1356,17 @@ def concatenate_audio_files(audio_files, output_file, silence_duration=0.0):
         return False
 
 
-def generate_timeline_animations(code_content, timeline_events, audio_duration, key_concepts, key_concepts_start_time):
+def generate_timeline_animations(code_content, timeline_events, audio_duration, key_concepts, key_concepts_start_time, overview_points=None, overview_duration=3.0):
     """
     Generate Manim code with timeline-based animations using REAL Whisper timestamps.
+    Now includes an overview slide that appears first.
     """
     print(f"🔍 DEBUG: generate_timeline_animations called")
     print(f"   - code_content length: {len(code_content)} characters")
     print(f"   - timeline_events: {len(timeline_events) if timeline_events else 0} events")
     print(f"   - audio_duration: {audio_duration}")
+    print(f"   - overview_points: {len(overview_points) if overview_points else 0} points")
+    print(f"   - overview_duration: {overview_duration:.2f}s")
     
     if not timeline_events or len(timeline_events) == 0:
         print(f"   ⚠️  WARNING: No timeline events! Highlights will not be created!")
@@ -1327,29 +1430,68 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
     escaped_code = cleaned_code.replace('\\', '\\\\').replace('"', '\\"')
     
     # ============================================================
+    # RECALCULATE OVERVIEW DURATION TO MATCH ACTUAL MANIM TIMING
+    # ============================================================
+    # The passed-in overview_duration is just a guideline
+    # We need to calculate the ACTUAL duration based on Manim animations
+    if overview_points and len(overview_points) > 0:
+        # These times MUST match the generated Manim code
+        title_write = 0.6
+        subtitle_fade = 0.4
+        wait_after_subtitle = 0.2
+        fade_in_per_point = 0.5
+        fade_out_all = 0.6
+        final_wait = 0.2
+        
+        total_animation_time = (
+            title_write + subtitle_fade + wait_after_subtitle +
+            (len(overview_points) * fade_in_per_point) +
+            fade_out_all + final_wait
+        )
+        
+        reading_time = overview_duration - total_animation_time
+        reading_time = max(reading_time, 2.0)
+        
+        # This is the ACTUAL duration that will happen in the video
+        actual_overview_duration = total_animation_time + reading_time
+        
+        print(f"\n🎬 Overview duration recalculation:")
+        print(f"   Passed-in duration: {overview_duration:.2f}s")
+        print(f"   Animation time: {total_animation_time:.2f}s")
+        print(f"   Reading time: {reading_time:.2f}s")
+        print(f"   ACTUAL duration: {actual_overview_duration:.2f}s")
+        
+        # Use the actual duration for all calculations
+        overview_duration = actual_overview_duration
+    
+    # ============================================================
     # HARDCODED VALUES EXPLANATION:
     # ============================================================
     # These values match the EXACT Manim scene timeline:
     # 
-    # Line 1186: self.wait(1.2)                    → 0.0s to 1.2s
-    # Line 1189: self.play(Write(title), run_time=0.5)  → 1.2s to 1.7s
-    # Line 1190: self.wait(1)                     → 1.7s to 2.7s
-    # Line 1221: self.play(FadeIn(full_code), run_time=0.5)  → 2.7s to 3.2s
+    # 0.0s - overview_duration: Overview/introduction period (overview slides)
+    #                           Overview slides explain what the code does
+    #                           Duration is MEASURED from actual Manim animations
     #
-    # So code becomes VISIBLE at 3.2s (when FadeIn completes)
-    # This is when we can START highlighting and scrolling
+    # overview_duration - (overview_duration + 0.5s): Title animation (0.5s)
+    #
+    # (overview_duration + 0.5s) - (overview_duration + 0.6s): Small wait (0.1s)
+    #
+    # (overview_duration + 0.6s) - (overview_duration + 1.1s): Code fade-in (0.5s)
+    #
+    # (overview_duration + 1.1s): Code becomes VISIBLE and ready for highlighting
+    #                             This is when we can START highlighting and scrolling
     # ============================================================
-    fixed_overhead = 1.2 + 0.5 + 1.0 + 0.5  # = 3.2s (when code appears and becomes interactive)
+    fixed_overhead = overview_duration + 0.5 + 0.1 + 0.5  # Actual overview time + animations
     
     print(f"\n{'='*60}")
     print("🔍 DEBUG: MANIM CODE GENERATION")
     print(f"{'='*60}")
     print(f"fixed_overhead = {fixed_overhead:.2f}s")
     print(f"  Breakdown:")
-    print(f"    - 1.2s: Initial wait (self.wait(1.2))")
-    print(f"    - 0.5s: Title animation (self.play(Write(title), run_time=0.5))")
-    print(f"    - 1.0s: Wait after title (self.wait(1))")
-    print(f"    - 0.5s: Code fade-in (self.play(FadeIn(full_code), run_time=0.5))")
+    print(f"    - 0.0s - 20.0s: Overview/introduction period")
+    print(f"    - Audio explains what the code does overall")
+    print(f"    - Code appears at 20.0s and becomes ready for highlighting")
     print(f"  Meaning: Code becomes VISIBLE and ready for highlighting at {fixed_overhead:.2f}s")
     print(f"  This is when scrolling and highlighting CAN START")
     print(f"Number of timeline events: {len(timeline_events)}")
@@ -1448,14 +1590,19 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
             font="Courier",
             line_spacing=1.0
         )
+        # CRITICAL: Apply the SAME scaling as the actual code!
+        # The code is scaled to fit width 13, so we must do the same here
+        if test_text.width > 13:
+            test_text.scale_to_fit_width(13)
+        
         # Calculate actual line height: total height / number of lines
         test_num_lines = min(5, num_code_lines)
         if test_num_lines > 0:
-            # CRITICAL: Use actual measured height from Manim Text object
+            # CRITICAL: Use actual measured height from Manim Text object AFTER scaling
             # The text height divided by number of lines gives us the actual line height
             actual_line_height = test_text.height / test_num_lines
             line_height = actual_line_height
-            print(f"   🔍 Measured line_height from Text object: {line_height:.3f} (height {test_text.height:.3f} / {test_num_lines} lines)")
+            print(f"   🔍 Measured line_height from Text object (AFTER scaling): {line_height:.3f} (height {test_text.height:.3f} / {test_num_lines} lines)")
         else:
             line_height = 0.44  # Fallback based on empirical measurement
     except Exception as e:
@@ -1588,13 +1735,16 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
         
         # Build line by line with 12-space indentation (matches if/else block level)
         indent = "            "  # 12 spaces
-        # Position: top of code - (center_line * line_height) - (line_height / 2) to get to center of first line
-        # Then add (block_height / 2) to get to center of block
+        # CRITICAL: Block detection gives 1-indexed lines, we convert to 0-indexed
+        # But Manim positioning counts from line 0 at the top
+        # If block starts at line 8 (1-indexed) = line 7 (0-indexed)
+        # We need to position at line 8 in the display, which is index 7+1=8 from top
+        # So we use (start_line_0indexed + 1) for positioning
         highlight_positioning += f"{indent}# Position highlight for lines {new_start_line}-{new_end_line} (0-indexed: {start_line_0indexed}-{end_line_0indexed})\n"
-        highlight_positioning += f"{indent}# Top of line {start_line_0indexed} is at: full_code.get_top()[1] - ({start_line_0indexed} * {line_height:.3f})\n"
-        highlight_positioning += f"{indent}# Center of block is at: top_of_start_line - ({block_height:.3f} / 2)\n"
-        highlight_positioning += f"{indent}block_{event_idx}_top_y = full_code.get_top()[1] - ({start_line_0indexed} * {line_height:.3f})\n"
-        highlight_positioning += f"{indent}block_{event_idx}_center_y = block_{event_idx}_top_y - ({block_height:.3f} / 2.0)\n"
+        highlight_positioning += f"{indent}# Positioning at display line {start_line_0indexed + 0.5}: full_code.get_top()[1] - ({start_line_0indexed + 0.5} * {line_height:.3f})\n"
+        highlight_positioning += f"{indent}# Center of block is at: center_of_start_line - (({num_lines_in_block} - 1) * {line_height:.3f} / 2)\n"
+        highlight_positioning += f"{indent}block_{event_idx}_start_line_center_y = full_code.get_top()[1] - ({start_line_0indexed + 0.5} * {line_height:.3f})\n"
+        highlight_positioning += f"{indent}block_{event_idx}_center_y = block_{event_idx}_start_line_center_y - (({num_lines_in_block} - 1) * {line_height:.3f} / 2.0)\n"
         highlight_positioning += f"{indent}highlight_{event_idx}.move_to([full_code.get_center()[0], block_{event_idx}_center_y, 0])\n"
         highlight_positioning += f"{indent}highlight_{event_idx}.stretch_to_fit_width(full_code.width + 0.3)\n"
         # CRITICAL: Ensure highlight height matches the actual block height
@@ -1753,28 +1903,39 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
         else:
             print(f"  ⚠️  No remaining wait (remaining_time <= 0)")
         
+        # CRITICAL: Calculate start_line_0indexed for THIS event
+        # Don't reuse the variable from the highlight positioning loop!
+        event_start_line_0indexed = block_start_line - 1  # Convert to 0-indexed
+        event_end_line_0indexed = block_end_line - 1
+        event_num_lines = block_end_line - block_start_line + 1
+        event_block_height = event_num_lines * line_height
+        
+        print(f"  🎯 Event highlight positioning:")
+        print(f"     Lines {block_start_line}-{block_end_line} (1-indexed)")
+        print(f"     Lines {event_start_line_0indexed}-{event_end_line_0indexed} (0-indexed)")
+        print(f"     Block height: {event_block_height:.3f} ({event_num_lines} lines × {line_height:.3f})")
+        
         # Generate enhanced animation with glow, animated border, and spotlight effect
         # Animation sequence: scroll (0.3s) + glow fade-in (0.2s) + border draw (0.3s) + fill fade-in (0.2s) + pulse (0.4s) = 1.4s or 1.1s
         # CRITICAL: Embed code_scroll_time value directly (not as variable reference)
-        animation_timeline += f"""            # Scroll only if needed (scroll_distance > 0)
-            scroll_time = 0.3 if {code_scroll_time:.2f} > 0 and scroll_distance > 0 else 0.0
-            if {code_scroll_time:.2f} > 0 and scroll_distance > 0:
+        animation_timeline += f"""            # Scroll only if needed (scroll_progress > 0 means actual scrolling)
+            scroll_time = 0.3 if {scroll_progress:.3f} > 0 and scroll_distance > 0 else 0.0
+            if {scroll_progress:.3f} > 0 and scroll_distance > 0:
                 seg_target_y = start_center_y + (scroll_distance * {scroll_progress:.3f})
-                # CRITICAL: Update highlight positions relative to new code position after scroll
-                code_top_y = seg_target_y + (full_code.height / 2)
-                # Position highlight: top at first line, center based on height
-                block_{event_idx}_top_y = code_top_y - ({start_line_0indexed} * {line_height:.3f})
-                block_{event_idx}_center_y = block_{event_idx}_top_y - ({block_height:.3f} / 2.0)
+                # CRITICAL: Scroll FIRST, then get the actual top position
+                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
+                # Now get the ACTUAL top position after scroll
+                code_top_y = full_code.get_top()[1]
+                # Position highlight: use (N + 1.5) for scrolling case - testing to move highlight further down
+                block_{event_idx}_start_line_center_y = code_top_y - ({event_start_line_0indexed + 1.5} * {line_height:.3f})
+                block_{event_idx}_center_y = block_{event_idx}_start_line_center_y - (({event_num_lines} - 1) * {line_height:.3f} / 2.0)
                 highlight_{event_idx}.move_to([code_center_x, block_{event_idx}_center_y, 0])
                 highlight_glow_{event_idx}.move_to([code_center_x, block_{event_idx}_center_y, 0])
-                self.play(full_code.animate.move_to([code_center_x, seg_target_y, 0]), run_time=0.3)
             else:
-                # No scrolling - highlights are already positioned correctly in highlight_positioning
-                # Just ensure they're at the right position relative to current code position
+                # No scrolling - use N+0.5 (Consistent with scrolling case)
                 code_top_y = full_code.get_top()[1]
-                # Position highlight: top at first line, center based on height
-                block_{event_idx}_top_y = code_top_y - ({start_line_0indexed} * {line_height:.3f})
-                block_{event_idx}_center_y = block_{event_idx}_top_y - ({block_height:.3f} / 2.0)
+                block_{event_idx}_start_line_center_y = code_top_y - ({event_start_line_0indexed + 0.5} * {line_height:.3f})
+                block_{event_idx}_center_y = block_{event_idx}_start_line_center_y - (({event_num_lines} - 1) * {line_height:.3f} / 2.0)
                 highlight_{event_idx}.move_to([full_code.get_center()[0], block_{event_idx}_center_y, 0])
                 highlight_glow_{event_idx}.move_to([full_code.get_center()[0], block_{event_idx}_center_y, 0])
             
@@ -1887,15 +2048,176 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
     if len(highlight_list) == 0:
         print(f"   ⚠️  WARNING: No highlights in highlight_list! Highlights will not appear!")
     
+    # Generate overview slides code if overview_points provided
+    if overview_points and len(overview_points) > 0:
+        # Calculate EXACT animation timings to match Manim scene
+        # These must match the actual run_time values in the generated code
+        title_write = 0.6
+        subtitle_fade = 0.4
+        wait_after_subtitle = 0.2
+        fade_in_per_point = 0.5
+        fade_out_all = 0.6
+        final_wait = 0.2
+        
+        # Calculate total animation time
+        total_animation_time = (
+            title_write +           # Title writes in
+            subtitle_fade +         # Subtitle fades in
+            wait_after_subtitle +   # Small wait
+            (len(overview_points) * fade_in_per_point) +  # Each bullet fades in
+            fade_out_all +          # Everything fades out
+            final_wait              # Final wait
+        )
+        
+        # Reading time is what's left from the passed-in duration
+        reading_time = overview_duration - total_animation_time
+        reading_time = max(reading_time, 2.0)  # At least 2 seconds to read
+        
+        # ACTUAL overview slide duration (what will really happen in video)
+        actual_overview_duration = total_animation_time + reading_time
+        
+        print(f"🎬 Overview timing breakdown:")
+        print(f"   Animations: {total_animation_time:.2f}s")
+        print(f"   Reading time: {reading_time:.2f}s")
+        print(f"   TOTAL: {actual_overview_duration:.2f}s")
+        
+        # Define vibrant colors for each bullet point
+        colors = ["#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8", "#F7DC6F"]
+        
+        overview_slides_code = f"""        # ============================================================
+        # ENGAGING OVERVIEW SLIDE - Dynamic and Visual
+        # Duration: {actual_overview_duration:.1f}s ({len(overview_points)} points)
+        # ============================================================
+        
+        # Background gradient effect
+        background_rect = Rectangle(
+            width=14,
+            height=8,
+            fill_opacity=0.08,
+            fill_color=BLUE,
+            stroke_width=0
+        )
+        self.add(background_rect)
+        
+        # Decorative circles for visual interest
+        circle1 = Circle(radius=2, fill_opacity=0.05, fill_color=PURPLE, stroke_width=0)
+        circle1.move_to([-4, 2, 0])
+        circle2 = Circle(radius=1.5, fill_opacity=0.05, fill_color=BLUE, stroke_width=0)
+        circle2.move_to([4, -2, 0])
+        self.add(circle1, circle2)
+        
+        # Main title with gradient effect
+        overview_title = Text(
+            "Code Overview",
+            font_size=48,
+            font="Helvetica",
+            weight=BOLD,
+            gradient=(BLUE, PURPLE)
+        )
+        overview_title.to_edge(UP, buff=0.5)
+        
+        # Subtitle
+        subtitle = Text(
+            "Let's understand what this code does",
+            font_size=22,
+            font="Helvetica",
+            color=GRAY,
+            slant=ITALIC
+        )
+        subtitle.next_to(overview_title, DOWN, buff=0.2)
+        
+        # Animate title with scale effect
+        self.play(
+            Write(overview_title),
+            run_time=0.6
+        )
+        self.play(
+            FadeIn(subtitle, shift=UP*0.2),
+            run_time=0.4
+        )
+        self.wait(0.2)
+        
+        # Create bullet points with icons and colors
+        bullet_points = VGroup()
+"""
+        
+        # Icon emojis for different types of points
+        icons = ["🎯", "⚡", "🔧", "💡", "🚀", "✨"]
+        
+        # Add each bullet point with icon and color
+        for idx, point in enumerate(overview_points):
+            # Escape the point text for Python string
+            escaped_point = point.replace('\\', '\\\\').replace('"', '\\"')
+            color = colors[idx % len(colors)]
+            icon = icons[idx % len(icons)]
+            
+            overview_slides_code += f"""        
+        # Point {idx + 1} with icon and color
+        icon_{idx} = Text("{icon}", font_size=32)
+        point_text_{idx} = Text(
+            "{escaped_point}",
+            font_size=24,
+            font="Helvetica",
+            color="{color}"
+        )
+        point_{idx} = VGroup(icon_{idx}, point_text_{idx})
+        point_{idx}.arrange(RIGHT, buff=0.3)
+        bullet_points.add(point_{idx})
+"""
+        
+        overview_slides_code += f"""        
+        # Arrange all bullet points
+        bullet_points.arrange(DOWN, aligned_edge=LEFT, buff=0.6)
+        bullet_points.next_to(subtitle, DOWN, buff=0.8)
+        bullet_points.to_edge(LEFT, buff=1.0)
+        
+        # Animate each bullet point with dynamic effects
+"""
+        
+        for idx in range(len(overview_points)):
+            # Alternate between different animation styles
+            if idx % 2 == 0:
+                animation = f"FadeIn(point_{idx}, shift=RIGHT*0.5, scale=1.2)"
+            else:
+                animation = f"FadeIn(point_{idx}, shift=LEFT*0.3)"
+            
+            overview_slides_code += f"""        self.play({animation}, run_time=0.5)
+"""
+        
+        overview_slides_code += f"""        
+        # Hold the slide for reading with subtle pulse effect
+        self.wait({reading_time:.2f})
+        
+        # Fade out with style
+        self.play(
+            FadeOut(overview_title, shift=UP*0.5),
+            FadeOut(subtitle, shift=UP*0.3),
+            FadeOut(bullet_points, shift=DOWN*0.5),
+            FadeOut(circle1),
+            FadeOut(circle2),
+            FadeOut(background_rect),
+            run_time=0.6
+        )
+        self.wait(0.2)
+        
+"""
+    else:
+        # No overview points - minimal wait
+        overview_slide_duration = 2.0
+        overview_slides_code = f"""        # No overview slides - minimal wait
+        self.wait({overview_slide_duration:.1f})
+        
+"""
+    
     code = f"""from manim import *
 
 class CodeExplanationScene(Scene):
     def construct(self):
-        self.wait(1.2)
+{overview_slides_code}        
         title = Text("Code Explanation", font_size=38, font="Helvetica", weight=BOLD, color=BLUE)
         title.to_edge(UP, buff=0.4)
         self.play(Write(title), run_time=0.5)
-        self.wait(1)
+        self.wait(0.1)
         
         full_code = Text(
             \"\"\"{escaped_code}\"\"\",
@@ -1970,11 +2292,12 @@ class CodeExplanationScene(Scene):
     return code
 
 
-def generate_code_display_code(code_content, audio_duration=None, narration_segments=None, key_concepts=None, key_concepts_start_time=None):
+def generate_code_display_code(code_content, audio_duration=None, narration_segments=None, key_concepts=None, key_concepts_start_time=None, overview_points=None, overview_duration=40.0):
     """
     Generate Manim code for scrolling code display - NO SLIDES, continuous scroll
     Code starts below title and scrolls UP (code moves UP) to reveal content below
     Adds final slide with key concepts if provided, synchronized with audio
+    Optionally shows overview slides at the beginning if overview_points provided
     """
     # Use original code (no cleaning - user won't pass comments)
     lines = code_content.strip().split('\n')
@@ -2053,14 +2376,66 @@ def generate_code_display_code(code_content, audio_duration=None, narration_segm
         self.wait(1)
 """
     
+    # Generate overview slides code if overview_points provided
+    if overview_points and len(overview_points) > 0:
+        # Calculate timing for overview slides
+        time_per_slide = overview_duration / max(len(overview_points), 1)
+        
+        overview_slides_code = f"""        # Overview Slides ({overview_duration:.1f}s total)
+        # Show {len(overview_points)} overview points about the code
+        
+        # Overview title
+        overview_title = Text(
+            "Code Overview",
+            font_size=42,
+            font="Helvetica",
+            weight=BOLD,
+            color=BLUE
+        )
+        overview_title.to_edge(UP, buff=0.5)
+        self.play(Write(overview_title), run_time=0.5)
+        self.wait(0.5)
+        
+"""
+        
+        # Add each overview point as a slide
+        for idx, point in enumerate(overview_points):
+            # Escape the point text for Python string
+            escaped_point = point.replace('\\', '\\\\').replace('"', '\\"')
+            
+            overview_slides_code += f"""        # Overview Point {idx + 1}
+        point_{idx} = Text(
+            "• {escaped_point}",
+            font_size=28,
+            font="Helvetica",
+            color=WHITE
+        )
+        point_{idx}.next_to(overview_title, DOWN, buff=1.0)
+        point_{idx}.to_edge(LEFT, buff=1.0)
+        self.play(FadeIn(point_{idx}), run_time=0.4)
+        self.wait({time_per_slide - 0.8:.2f})
+        self.play(FadeOut(point_{idx}), run_time=0.4)
+        
+"""
+        
+        overview_slides_code += f"""        # Fade out overview title
+        self.play(FadeOut(overview_title), run_time=0.5)
+        self.wait(0.5)
+        
+"""
+    else:
+        # No overview points - just wait
+        overview_slides_code = f"""        # No overview slides - waiting {overview_duration:.1f}s
+        self.wait({overview_duration:.1f})
+        
+"""
+    
     # Create full code text
     code = f"""from manim import *
 
 class CodeExplanationScene(Scene):
     def construct(self):
-        # Initial wait
-        self.wait(1.2)
-        
+{overview_slides_code}        
         # Title
         title = Text(
             "Code Explanation",
@@ -2071,7 +2446,7 @@ class CodeExplanationScene(Scene):
         )
         title.to_edge(UP, buff=0.4)
         self.play(Write(title), run_time=0.5)
-        self.wait(1)
+        self.wait(0.1)  # Small wait after title
         
         # Create full code text (larger font, no gaps)
         full_code = Text(
@@ -2122,12 +2497,13 @@ class CodeExplanationScene(Scene):
         
         # Final slide: Key Concepts (if provided) - appears exactly when audio explains them
 {concepts_slide_code}
+```
 """
     
     return code
 
 
-def code_to_video(code_content: str, output_name: str = "output", audio_language: str = "english"):
+def code_to_video(code_content: str, output_name: str = "output", audio_language: str = "english", add_subtitles: bool = False):
     """
     Convert code to video with audio explanation
     
@@ -2140,6 +2516,7 @@ def code_to_video(code_content: str, output_name: str = "output", audio_language
         code_content: The code you want to explain
         output_name: Name for output file
         audio_language: Language for audio narration
+        add_subtitles: If True, generate and embed SRT subtitles using Whisper
         
     Returns:
         dict with 'final_video' path or None if failed
@@ -2156,7 +2533,41 @@ def code_to_video(code_content: str, output_name: str = "output", audio_language
         
         client = openai.OpenAI(api_key=api_key)
         
-        # Step 0: Parse code into blocks FIRST
+        # CRITICAL: Remove comments BEFORE parsing blocks
+        # This ensures block line numbers match the cleaned code that will be displayed
+        print("🧹 Removing comments from code...")
+        def remove_comments(line):
+            """Remove // and /* */ comments from a line"""
+            if '//' in line:
+                in_string = False
+                quote_char = None
+                for i, char in enumerate(line):
+                    if char in ['"', "'"] and (i == 0 or line[i-1] != '\\'):
+                        if not in_string:
+                            in_string = True
+                            quote_char = char
+                        elif char == quote_char:
+                            in_string = False
+                            quote_char = None
+                    elif char == '/' and i < len(line) - 1 and line[i+1] == '/' and not in_string:
+                        return line[:i].rstrip()
+                return line
+            return line
+        
+        # Remove comments AND blank lines before parsing
+        # This ensures block line numbers match the final displayed code
+        original_lines = code_content.strip().split('\n')
+        code_without_comments_lines = [remove_comments(line) for line in original_lines]
+        
+        # Remove blank lines too
+        code_cleaned_lines = [line for line in code_without_comments_lines if line.strip()]
+        code_cleaned = '\n'.join(code_cleaned_lines)
+        
+        print(f"   Original lines: {len(original_lines)}")
+        print(f"   After comment removal: {len(code_without_comments_lines)} lines")
+        print(f"   After blank line removal: {len(code_cleaned_lines)} lines")
+        
+        # Step 0: Parse code into blocks (on CLEANED code - no comments, no blank lines)
         print("📦 Parsing code into semantic blocks...")
         language = "python"
         if "public class" in code_content or "public static" in code_content:
@@ -2164,7 +2575,8 @@ def code_to_video(code_content: str, output_name: str = "output", audio_language
         elif "function" in code_content and "{" in code_content:
             language = "javascript"
         
-        code_blocks = parse_code_to_blocks(code_content, language=language)
+        # Parse blocks on fully cleaned code
+        code_blocks = parse_code_to_blocks(code_cleaned, language=language)
         print(f"✅ Found {len(code_blocks)} code blocks\n")
         
         # DEBUG: Print all detected blocks BEFORE filtering
@@ -2291,10 +2703,157 @@ def code_to_video(code_content: str, output_name: str = "output", audio_language
         
         if len(all_blocks_for_narration) == 0:
             print("⚠️  No code blocks found, using simple scrolling\n")
-            manim_code = generate_code_display_code(code_content, audio_duration, None, key_concepts, key_concepts_start_time)
+            
+            # Generate a general explanation for the code
+            print("🎙️ Creating general narration...")
+            narration_response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "You are an expert programming educator. Explain this code clearly and concisely. Focus on what the code does overall."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Explain this code:\n\n```\n{code_content}\n```"
+                    }
+                ],
+                temperature=0.7
+            )
+            narration_text = narration_response.choices[0].message.content.strip()
+            
+            # Generate audio
+            audio_file = f"{output_name}_audio.aiff"
+            generate_audio_for_language(narration_text, audio_language, audio_file, client)
+            
+            # Get duration
+            audio_duration = get_audio_duration(audio_file)
+            if not audio_duration:
+                audio_duration = len(narration_text) * 0.06
+            
+            # No key concepts for simple fallback
+            key_concepts = None
+            key_concepts_start_time = None
+            overview_points = None  # No overview for simple fallback
+            overview_duration = 40.0  # Default duration
+            
+            manim_code = generate_code_display_code(code_content, audio_duration, None, key_concepts, key_concepts_start_time, overview_points, overview_duration)
         else:
+            # Step 0.5: Generate OVERVIEW narration and slide
+            print("📋 Creating code overview slide...")
+            overview_response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "Create a brief, high-level overview of what this code does. Focus on the main purpose and key components. Return 4-6 bullet points, each under 80 characters."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Provide a brief overview of this code:\n\n```\n{code_content}\n```\n\nReturn as bullet points (2-4 points, each under 80 chars)."
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=200
+            )
+            
+            overview_text = overview_response.choices[0].message.content.strip()
+            # Extract bullet points (remove markdown bullets if present)
+            overview_points = []
+            for line in overview_text.split('\n'):
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    # Remove markdown bullets
+                    line = line.lstrip('•-*').strip()
+                    if line:
+                        overview_points.append(line)
+            
+            # Limit to 4 points
+            overview_points = overview_points[:4]
+            
+            print(f"✅ Overview created with {len(overview_points)} points")
+            
+            # Calculate dynamic overview duration based on number of points
+            # More points = more time needed
+            base_time_per_point = 3.0  # Base reading time per point
+            animation_time = 2.0  # Time for animations
+            calculated_overview_duration = (len(overview_points) * base_time_per_point) + animation_time
+            
+            print(f"📊 Calculated overview duration: {calculated_overview_duration:.1f}s ({len(overview_points)} points × {base_time_per_point}s + {animation_time}s animations)")
+            
+            # Generate overview narration that covers all points
+            print("🎙️ Creating overview narration...")
+            
+            # Create narration prompt that includes all bullet points
+            bullet_text = "\n".join([f"- {point}" for point in overview_points])
+            
+            # Calculate realistic word count (2.5 words per second is natural speaking rate)
+            target_words = int(calculated_overview_duration * 2.5)
+            
+            overview_narration_response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"Create a BRIEF spoken introduction (maximum {target_words} words, about {int(calculated_overview_duration)} seconds of speech) that introduces what this code does. Be concise and natural."
+                    },
+                    {
+                        "role": "user",
+                        "content": f"Create a brief introduction covering these points:\n\n{bullet_text}\n\nKeep it under {target_words} words total."
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=int(target_words * 1.5)  # Slightly more tokens than words for safety
+            )
+            
+            overview_narration = overview_narration_response.choices[0].message.content.strip()
+            print(f"✅ Overview narration created ({len(overview_narration)} chars)")
+            
+            # Generate audio for overview
+            overview_audio_file = f"{output_name}_overview_audio.aiff"
+            print(f"   Generating audio for overview...")
+            generate_audio_for_language(overview_narration, audio_language, overview_audio_file, client)
+            
+            # Measure the actual audio duration
+            actual_audio_duration = get_audio_duration(overview_audio_file)
+            if not actual_audio_duration:
+                actual_audio_duration = len(overview_narration) * 0.06
+            
+            # Pad the audio to match calculated_overview_duration
+            if actual_audio_duration < calculated_overview_duration:
+                silence_needed = calculated_overview_duration - actual_audio_duration
+                print(f"   📊 Overview audio: {actual_audio_duration:.2f}s")
+                print(f"   📊 Overview slide: {calculated_overview_duration:.2f}s")
+                print(f"   ➕ Adding {silence_needed:.2f}s of silence to match slide duration...")
+                
+                # Create padded audio file by concatenating audio + silence
+                padded_audio_file = f"{output_name}_overview_audio_padded.aiff"
+                pad_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", overview_audio_file,
+                    "-f", "lavfi",
+                    "-t", str(silence_needed),
+                    "-i", "anullsrc=channel_layout=stereo:sample_rate=44100",
+                    "-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1[out]",
+                    "-map", "[out]",
+                    padded_audio_file
+                ]
+                subprocess.run(pad_cmd, check=True, capture_output=True)
+                
+                # Replace original with padded
+                os.replace(padded_audio_file, overview_audio_file)
+                
+                # Verify the new duration
+                new_duration = get_audio_duration(overview_audio_file)
+                print(f"   ✅ Overview audio padded to {new_duration:.2f}s")
+            
+            # Use calculated duration (not measured from audio)
+            # This ensures consistent timing based on code complexity
+            overview_duration = calculated_overview_duration
+            print(f"   ✅ Final overview duration: {overview_duration:.2f}s")
+            
             # Step 1: Generate narration PER BLOCK (ALL blocks get narration)
-            print("🎙️ Creating block-by-block narration...")
+            print("\n🎙️ Creating block-by-block narration...")
             print(f"   Generating narration for {len(all_blocks_for_narration)} blocks (ALL blocks)")
             print(f"   Creating highlights for {len(blocks_for_highlights)} blocks (only blocks that don't contain others)")
             print()
@@ -2309,35 +2868,64 @@ def code_to_video(code_content: str, output_name: str = "output", audio_language
             # The Manim video has a timeline that looks like this:
             #
             #   0.0s ────────────────────────────────────────────────────
-            #         Video starts (black screen)
+            #         Video starts - Overview slides appear
+            #         Overview narration plays (actual duration measured)
             #         
-            #   1.2s ────────────────────────────────────────────────────
-            #         self.wait(1.2) ends
+            #   overview_duration ───────────────────────────────────────
+            #         Title animation starts (0.5s)
             #         
-            #   1.7s ────────────────────────────────────────────────────
-            #         self.play(Write(title), run_time=0.5) ends
-            #         Title is now visible
+            #   overview_duration + 0.5s ────────────────────────────────
+            #         Small wait (0.1s)
             #         
-            #   2.7s ────────────────────────────────────────────────────
-            #         self.wait(1) ends (wait after title)
+            #   overview_duration + 0.6s ────────────────────────────────
+            #         Code fade-in starts (0.5s)
             #         
-            #   3.2s ────────────────────────────────────────────────────
-            #         self.play(FadeIn(full_code), run_time=0.5) ends
+            #   overview_duration + 1.1s ────────────────────────────────
             #         ⭐ CODE IS NOW VISIBLE ⭐
-            #         This is intro_delay = 3.2s
+            #         Block-by-block narration starts
             #
-            # PROBLEM: Audio narration starts at 0.0s, but code isn't visible until 3.2s!
-            # SOLUTION: We CANNOT highlight code before it appears, so we use intro_delay
-            #           to ensure highlights only happen when code is visible.
+            # SOLUTION: intro_delay = overview_duration + 0.5 (title) + 0.1 (wait) + 0.5 (fade)
+            #           This ensures block narrations start exactly when code appears
             #
             # This MUST match fixed_overhead in generate_timeline_animations()
             # ============================================================
-            intro_delay = 3.2
+            
+            # RECALCULATE overview_duration to match actual Manim timing
+            if len(overview_points) > 0:
+                title_write = 0.6
+                subtitle_fade = 0.4
+                wait_after_subtitle = 0.2
+                fade_in_per_point = 0.5
+                fade_out_all = 0.6
+                final_wait = 0.2
+                
+                total_animation_time = (
+                    title_write + subtitle_fade + wait_after_subtitle +
+                    (len(overview_points) * fade_in_per_point) +
+                    fade_out_all + final_wait
+                )
+                
+                reading_time = overview_duration - total_animation_time
+                reading_time = max(reading_time, 2.0)
+                
+                actual_overview_duration = total_animation_time + reading_time
+                
+                print(f"\n🎬 Recalculating overview duration for intro_delay:")
+                print(f"   Audio duration: {overview_duration:.2f}s")
+                print(f"   Animation time: {total_animation_time:.2f}s")
+                print(f"   Reading time: {reading_time:.2f}s")
+                print(f"   ACTUAL overview duration: {actual_overview_duration:.2f}s")
+                
+                overview_duration = actual_overview_duration
+            
+            intro_delay = overview_duration + 0.5 + 0.1 + 0.5  # Actual overview time + animations
             
             print(f"\n{'='*60}")
             print("🔍 DEBUG: TIMELINE CONSTRUCTION")
             print(f"{'='*60}")
-            print(f"intro_delay = {intro_delay}s (when code appears on screen)")
+            print(f"intro_delay = {intro_delay:.2f}s (overview/introduction duration)")
+            print(f"  During 0.0s - {intro_delay:.2f}s: Overview audio plays")
+            print(f"  At {intro_delay:.2f}s: Code appears and block narrations start")
             print(f"Starting cumulative_time = {cumulative_time}s\n")
             
             # CRITICAL: Iterate over ALL blocks for narration
@@ -2603,13 +3191,16 @@ def code_to_video(code_content: str, output_name: str = "output", audio_language
                 print("❌ No valid audio files generated! Cannot create video.")
                 return None
             
-            # Concatenate all block audio files with silence at start
-            # CRITICAL: Add intro_delay seconds of silence so narration starts when code appears
-            print(f"\n🔗 Concatenating {len(block_audios)} audio files with {intro_delay:.2f}s silence at start...")
-            print(f"   This ensures narration starts exactly when code becomes visible (at {intro_delay:.2f}s)")
+            # Prepend overview audio to block audios
+            all_audio_files = [overview_audio_file] + block_audios
+            
+            # Concatenate all audio files (overview + blocks) with NO silence at start
+            # The overview audio will play during 0.0s - ~3.0s, then blocks start
+            print(f"\n🔗 Concatenating {len(all_audio_files)} audio files (1 overview + {len(block_audios)} blocks)...")
+            print(f"   Overview audio will play first, then block narrations")
             audio_file = f"{output_name}_audio.aiff"
             
-            if not concatenate_audio_files(block_audios, audio_file, silence_duration=intro_delay):
+            if not concatenate_audio_files(all_audio_files, audio_file, silence_duration=0.0):
                 print("❌ Audio concatenation failed!")
                 print("   Attempting to use first block audio as fallback...")
                 
@@ -2826,8 +3417,17 @@ Make it natural and concise. Start with "Key concepts include..." or similar."""
                     print(f"⚠️  Could not determine code narration end time\n")
             
             # Step 6: Generate Manim code with timeline-based animations
-            print("🎨 Generating Manim code with Whisper timestamp synchronization...")
-            manim_code = generate_timeline_animations(code_content, timeline_events, audio_duration, key_concepts, key_concepts_start_time)
+            # CRITICAL: Use code_cleaned so line numbers match what will be displayed
+            print("🎨 Generating Manim code with overview slide and Whisper timestamp synchronization...")
+            manim_code = generate_timeline_animations(
+                code_cleaned, 
+                timeline_events, 
+                audio_duration, 
+                key_concepts, 
+                key_concepts_start_time,
+                overview_points,
+                overview_duration
+            )
             print("✅ Manim code generated\n")
         
         # Step 7: Render video
@@ -2955,6 +3555,15 @@ Make it natural and concise. Start with "Key concepts include..." or similar."""
         except Exception as e:
             print(f"   ⚠️  Could not get durations: {e}")
         
+        # Step 8.5: Generate subtitles if requested
+        srt_file = None
+        if add_subtitles:
+            srt_file = f"{output_name}_subtitles.srt"
+            subtitle_success = generate_srt_from_audio(audio_file, srt_file)
+            if not subtitle_success:
+                print("   ⚠️  Continuing without subtitles...")
+                srt_file = None
+        
         final_output = f"{output_name}_final.mp4"
         
         # Build command - use longer duration and loop audio if needed
@@ -2963,6 +3572,11 @@ Make it natural and concise. Start with "Key concepts include..." or similar."""
             "-i", video_path,
             "-i", audio_file,
         ]
+        
+        # Add subtitle input if available
+        if srt_file and os.path.exists(srt_file):
+            combine_cmd.extend(["-i", srt_file])
+            print(f"   📝 Adding subtitles: {srt_file}")
         
         # If audio is shorter, loop it to match video
         if video_duration and audio_duration_actual and audio_duration_actual < video_duration:
@@ -2973,12 +3587,21 @@ Make it natural and concise. Start with "Key concepts include..." or similar."""
             combine_cmd.extend([
                 "-filter_complex", f"[1:a]aloop=loop={loop_count}:size=2e+09[a]",
                 "-c:v", "copy",  # Copy video (faster, no quality loss)
-            "-c:a", "aac",
+                "-c:a", "aac",
                 "-b:a", "192k",
                 "-map", "0:v",
                 "-map", "[a]",
                 "-shortest",  # Use video duration
             ])
+            # Add subtitle mapping if available
+            if srt_file and os.path.exists(srt_file):
+                combine_cmd.extend([
+                    "-map", "2:s",
+                    "-c:s", "mov_text",
+                    "-metadata:s:s:0", "language=eng",
+                    "-metadata:s:s:0", "title=English",
+                    "-disposition:s:0", "default"
+                ])
         elif video_duration and audio_duration_actual and video_duration < audio_duration_actual:
             print(f"   ⚠️  Video ({video_duration:.2f}s) is shorter than audio ({audio_duration_actual:.2f}s)")
             print(f"   🔄 Trimming audio to match video duration...")
@@ -2991,6 +3614,15 @@ Make it natural and concise. Start with "Key concepts include..." or similar."""
                 "-map", "0:v",
                 "-map", "[a]",
             ])
+            # Add subtitle mapping if available
+            if srt_file and os.path.exists(srt_file):
+                combine_cmd.extend([
+                    "-map", "2:s",
+                    "-c:s", "mov_text",
+                    "-metadata:s:s:0", "language=eng",
+                    "-metadata:s:s:0", "title=English",
+                    "-disposition:s:0", "default"
+                ])
         else:
             # Same duration or unknown - use standard combination
             # Use copy for video (Manim already creates QuickTime-compatible video)
@@ -2999,8 +3631,17 @@ Make it natural and concise. Start with "Key concepts include..." or similar."""
                 "-c:v", "copy",  # Copy video stream (no re-encoding, faster, maintains compatibility)
                 "-c:a", "aac",   # Re-encode audio to AAC
                 "-b:a", "192k",  # Set audio bitrate for compatibility
-            "-shortest",
+                "-shortest",
             ])
+            # Add subtitle mapping if available
+            if srt_file and os.path.exists(srt_file):
+                combine_cmd.extend([
+                    "-map", "2:s",
+                    "-c:s", "mov_text",
+                    "-metadata:s:s:0", "language=eng",
+                    "-metadata:s:s:0", "title=English",
+                    "-disposition:s:0", "default"
+                ])
         
         combine_cmd.append(final_output)
         

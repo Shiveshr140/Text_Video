@@ -2,31 +2,18 @@ from manim import *
 
 class DebugLinePositions(Scene):
     def construct(self):
-        # Create the code text (Java pyramid pattern - cleaned, no comments or blank lines)
+        # Create the code text
         code_lines = [
-            "public class GFG {",                                    # Line 0
-            "    public static void main(String[] args)",            # Line 1
-            "    {",                                                 # Line 2
-            "        int num = 5;",                                  # Line 3
-            "        int x = 0;",                                    # Line 4
-            "        for (int i = 1; i <= num; i++) {",             # Line 5 - OUTER FOR LOOP START
-            "            x = i - 1;",                                # Line 6
-            "            for (int j = i; j <= num - 1; j++) {",     # Line 7 - INNER FOR LOOP START
-            "                System.out.print(\" \");",              # Line 8
-            "                System.out.print(\"  \");",             # Line 9
-            "            }",                                         # Line 10 - INNER FOR LOOP END
-            "            for (int j = 0; j <= x; j++)",             # Line 11 - SECOND INNER FOR LOOP
-            "                System.out.print((i + j) < 10",         # Line 12
-            "                                     ? (i + j) + \"  \"", # Line 13
-            "                                     : (i + j) + \" \");", # Line 14
-            "            for (int j = 1; j <= x; j++)",             # Line 15 - THIRD INNER FOR LOOP
-            "                System.out.print((i + x - j) < 10",     # Line 16
-            "                                     ? (i + x - j) + \"  \"", # Line 17
-            "                                     : (i + x - j) + \" \");", # Line 18
-            "            System.out.println();",                    # Line 19
-            "        }",                                            # Line 20 - OUTER FOR LOOP END
-            "    }",                                                # Line 21
-            "}"                                                     # Line 22
+            "function findLargest(arr) {",      # Line 0
+            "    let largest = arr[0]; ",       # Line 1
+            "    for (let i = 1; i < arr.length; i++) {",  # Line 2 - FOR LOOP START
+            "        if (arr[i] > largest) {",  # Line 3
+            "            largest = arr[i]; ",   # Line 4
+            "        }",                         # Line 5
+            "    }",                             # Line 6 - FOR LOOP END
+            "    return largest;",               # Line 7
+            "}",                                 # Line 8
+            "console.log(findLargest([99, 5, 3, 100, 1]));"  # Line 9
         ]
         
         full_code_text = "\n".join(code_lines)
@@ -93,9 +80,9 @@ class DebugLinePositions(Scene):
         
         self.add(markers)
         
-        # Highlight the outer for loop area (lines 5-20)
-        for_loop_start = 5
-        for_loop_end = 20
+        # Highlight the for loop area (lines 2-6)
+        for_loop_start = 2
+        for_loop_end = 6
         for_loop_height = (for_loop_end - for_loop_start + 1) * line_height
         
         highlight = Rectangle(

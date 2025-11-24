@@ -369,7 +369,7 @@ class AudioGenerator:
         clean_text = re.sub(r'\s+', ' ', clean_text)  # Replace multiple spaces with single space
         clean_text = re.sub(r'[🧩💡⚙️📦🏗️➡️🔗🧭🎯]', '', clean_text)  # Remove emojis
         clean_text = clean_text.strip()
-            
+        
         # Generate audio based on provider
         try:
             if self.provider == "openai" and self.openai_client:
@@ -1212,13 +1212,13 @@ class UniversalContentScene(Scene):
             
             # Create single unified text object with CONSISTENT styling
             text_obj = Text(
-            full_text,
-            font_size=24,  # Consistent size for all content
-            color=WHITE,
-            font="Helvetica Neue",
-            line_spacing=0.8,  # Tighter line spacing
-            weight=NORMAL,
-            disable_ligatures=True  # Better rendering
+                full_text,
+                font_size=24,  # Consistent size for all content
+                color=WHITE,
+                font="Helvetica Neue",
+                line_spacing=0.8,  # Tighter line spacing
+                weight=NORMAL,
+                should_center=False
             )
             
             # Scale if too wide
@@ -1245,9 +1245,9 @@ class UniversalContentScene(Scene):
             
             # ANIMATION: Fade in smoothly
             self.play(
-            FadeIn(content_elements, shift=UP * 0.3),
-            run_time=1.2
-                )
+                FadeIn(content_elements, shift=UP * 0.3),
+                run_time=1.2
+            )
         
         # Code with STUNNING visual presentation
         code_obj = None

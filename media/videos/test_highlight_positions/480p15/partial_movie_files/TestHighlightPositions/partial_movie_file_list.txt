@@ -1,0 +1,2 @@
+# This file is used internally by FFMPEG.
+file 'file:/Users/apple/Desktop/Manim-Copy/media/videos/test_highlight_positions/480p15/partial_movie_files/TestHighlightPositions/1185818338_3644383913_108284755.mp4'

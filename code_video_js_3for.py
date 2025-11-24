@@ -18,48 +18,36 @@ if __name__ == "__main__":
     print("💻"*30 + "\n")
     
     sample_code = """
-   // Java Program to Print the Pyramid pattern
+   function areAnagrams(str1, str2) {
+    if (str1.length !== str2.length) {
+        return false; 
+    }
 
-// Main class
-public class GFG {
+    let count1 = {};
+    let count2 = {};
 
-    // Main driver method
-    public static void main(String[] args)
-    {
-        int num = 5;
-        int x = 0;
+    // Count frequency of each character in str1
+    for (let i = 0; i < str1.length; i++) {
+        let char = str1[i];
+        count1[char] = (count1[char] || 0) + 1;
+    }
 
-        // Outer loop for rows
-        for (int i = 1; i <= num; i++) {
-            x = i - 1;
+    // Count frequency of each character in str2
+    for (let i = 0; i < str2.length; i++) {
+        let char = str2[i];
+        count2[char] = (count2[char] || 0) + 1;
+    }
 
-            // inner loop for "i"th row printing
-            for (int j = i; j <= num - 1; j++) {
-
-                // First Number Space
-                System.out.print(" ");
-
-                // Space between Numbers
-                System.out.print("  ");
-            }
-
-            // Pyramid printing
-            for (int j = 0; j <= x; j++)
-                System.out.print((i + j) < 10
-                                     ? (i + j) + "  "
-                                     : (i + j) + " ");
-
-            for (int j = 1; j <= x; j++)
-                System.out.print((i + x - j) < 10
-                                     ? (i + x - j) + "  "
-                                     : (i + x - j) + " ");
-
-            // By now we reach end for one row, so
-            // new line to switch to next
-            System.out.println();
+    // Compare the two frequency objects
+    for (let char in count1) {
+        if (count1[char] !== count2[char]) {
+            return false; 
         }
     }
+
+    return true; 
 }
+console.log(areAnagrams("listen", "silent"));
 
 """
     
