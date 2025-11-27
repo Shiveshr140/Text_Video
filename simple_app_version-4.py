@@ -1503,10 +1503,8 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
         print(f"   ACTUAL duration: {actual_overview_duration:.2f}s")
         print(f"   ✅ This matches when narration actually ends!")
         
-        # DISABLED: This recalculation was overriding our hardcoded timing
-        # We need overview_duration to stay at 32.4s (set earlier) so code appears at 33s
-        # overview_duration = actual_overview_duration
-        print(f"   ⚠️  Keeping hardcoded overview_duration = {overview_duration:.2f}s (not using calculated {actual_overview_duration:.2f}s)")
+        # Use the actual duration for all calculations
+        overview_duration = actual_overview_duration
     
     # ============================================================
     # HARDCODED VALUES EXPLANATION:
@@ -1529,7 +1527,7 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
     # CRITICAL: Calculate actual fixed_overhead including skeleton setup time
     # For Code Hike style, we need to account for skeleton display
     if use_incremental_reveal:
-        # USER REQUIREMENT: Narration starts at 33s, code displays at 36s (3s transition)
+        # USER REQUIREMENT: Overview ends at 33s, 3s transition, code at 36s
         # fixed_overhead = overview_duration + 0.6s
         # So overview_duration must be 35.4s to get code at 36s
         overview_duration = 35.4
@@ -2989,81 +2987,38 @@ def code_to_video(code_content: str, output_name: str = "output", audio_language
                 # Fallback if file not found (should not happen as we created it)
                 print("   ⚠️  Template module not found, creating inline...")
                 def generate_template_overview(animation_type, visual_concept, key_steps, duration):
-                    return (f"""# Fallback template
+                    return f"""# Fallback template
 title = Text("{visual_concept[:40]}", font_size=36, color=BLUE).to_edge(UP)
 self.play(Write(title), run_time=1.5)
 self.wait({duration - 3.0})
 self.play(FadeOut(Group(*self.mobjects)), run_time=1.5)
-""", "This code demonstrates a programming concept.")
+"""
+
+            # Determine duration based on code length
+            code_lines = len([line for line in code_content.split('\n') if line.strip()])
+            needs_long_overview = code_lines > 14
             
-            # CRITICAL FIX: Template overview is not respecting duration
-            # It's generating animations that take WAY longer than target_overview_duration
-            # SOLUTION: Use simple wait instead of complex template
+            if needs_long_overview:
+                target_overview_duration = 33.0  # USER REQUIREMENT: Overview ends at 33s
+                print(f"   📏 Long code ({code_lines} lines) - 33s overview")
+            else:
+                target_overview_duration = 15.0
+                print(f"   📏 Short code ({code_lines} lines) - 15s overview")
             
-            target_overview_duration = 33.0
-            print(f"   📏 Using SIMPLE overview (33s wait) - template was causing timing issues")
             
-            # Animated pyramid overview - EXACTLY 33 seconds
-            overview_animation_code = '''# Pyramid Overview - Exact 33s duration
-# Title (2s)
-title = Text("Pyramid Pattern with Nested Loops", font_size=36, color=BLUE).to_edge(UP)
-self.play(Write(title), run_time=1.5)
-self.wait(0.5)
-
-# Explanation (2.5s)
-explain = Text("Outer loop controls rows, Inner loops control numbers", font_size=20, color=WHITE).next_to(title, DOWN, buff=0.5)
-self.play(Write(explain), run_time=2.0)
-self.wait(0.5)
-
-# Build pyramid row by row with labels (24.5s total for 5 rows)
-# Row 1 (4.5s)
-row1 = Text("1", font_size=32, color=YELLOW).shift(UP*1.5)
-row1_label = Text("Row 1: 1 number", font_size=18, color=GREEN).next_to(row1, LEFT, buff=0.5)
-self.play(Write(row1), Write(row1_label), run_time=2.0)
-self.wait(2.5)
-
-# Row 2 (4.5s)
-row2 = VGroup(Text("1", font_size=32, color=YELLOW), Text("2", font_size=32, color=YELLOW)).arrange(RIGHT, buff=0.3).shift(UP*0.7)
-row2_label = Text("Row 2: 2 numbers", font_size=18, color=GREEN).next_to(row2, LEFT, buff=0.5)
-self.play(FadeIn(row2), Write(row2_label), run_time=2.0)
-self.wait(2.5)
-
-# Row 3 (4.5s)
-row3 = VGroup(*[Text(str(i), font_size=32, color=YELLOW) for i in range(1, 4)]).arrange(RIGHT, buff=0.3).shift(DOWN*0.1)
-row3_label = Text("Row 3: 3 numbers", font_size=18, color=GREEN).next_to(row3, LEFT, buff=0.5)
-self.play(FadeIn(row3), Write(row3_label), run_time=2.0)
-self.wait(2.5)
-
-# Row 4 (4.5s)
-row4 = VGroup(*[Text(str(i), font_size=28, color=YELLOW) for i in range(1, 5)]).arrange(RIGHT, buff=0.25).shift(DOWN*0.9)
-row4_label = Text("Row 4: 4 numbers", font_size=18, color=GREEN).next_to(row4, LEFT, buff=0.5)
-self.play(FadeIn(row4), Write(row4_label), run_time=2.0)
-self.wait(2.5)
-
-# Row 5 (4.5s)
-row5 = VGroup(*[Text(str(i), font_size=24, color=YELLOW) for i in range(1, 6)]).arrange(RIGHT, buff=0.2).shift(DOWN*1.7)
-row5_label = Text("Row 5: 5 numbers", font_size=18, color=GREEN).next_to(row5, LEFT, buff=0.5)
-self.play(FadeIn(row5), Write(row5_label), run_time=2.0)
-self.wait(2.5)
-
-# Highlight pattern (2s)
-all_rows = VGroup(row1, row2, row3, row4, row5)
-highlight = SurroundingRectangle(all_rows, color=GREEN, buff=0.3, stroke_width=2)
-self.play(Create(highlight), run_time=1.5)
-self.wait(0.5)
-
-# Extra wait to reach exactly 33s (2s)
-self.wait(2.0)
-
-# Fade out (2s)
-self.play(FadeOut(Group(*self.mobjects)), run_time=2.0)
-'''
+            # Generate template (returns animation code AND matching narration)
+            overview_animation_code, overview_narration = generate_template_overview(
+                animation_type,
+                visual_concept,
+                key_steps,
+                target_overview_duration
+            )
             
-            overview_narration = """Welcome to this code explanation. Today we'll explore a pyramid pattern created using nested loops. The outer loop controls the rows of our pyramid, while the inner loops control the numbers in each row. Row one contains just the number one. Row two contains numbers one and two. Row three has one, two, and three. This pattern continues, with each row displaying numbers from one up to the current row number, creating a triangular pyramid shape. Now let's examine the actual code."""
-            
-            calculated_overview_duration = target_overview_duration
-            print(f"   ✅ Simple overview generated ({len(overview_animation_code)} chars, {target_overview_duration}s)")
+            print(f"   ✅ Template generated ({len(overview_animation_code)} chars, {target_overview_duration}s)")
             print(f"   ✅ Narration generated ({len(overview_narration)} chars)")
+            
+            # Set calculated duration to target (templates are exact)
+            calculated_overview_duration = target_overview_duration
             print(f"   📊 FINAL Overview Duration: {calculated_overview_duration:.1f}s")
             
             # Skip AI narration generation - we have template narration
@@ -3273,7 +3228,7 @@ Provide a BRIEF overview (under 200 characters) mentioning it contains inner blo
                 - Start by explicitly mentioning the block type: "This {block_type_name}..." or "The {block_type_name}..."
                 - Do NOT mention what the entire code does
                 - Do NOT give an overview or introduction
-                - Do NOT say "this code" or "the program" without specifying it\'s a {block_type_name}
+                - Do NOT say "this code" or "the program" without specifying it's a {block_type_name}
                 - Focus ONLY on what THIS specific {block_type_name} does
                 - Start directly: "This {block_type_name}..." or "The {block_type_name}..."
 

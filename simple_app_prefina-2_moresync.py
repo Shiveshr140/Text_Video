@@ -1379,8 +1379,6 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
     Generate Manim code with timeline-based animations using REAL Whisper timestamps.
     Now includes an ANIMATED overview (like OpenNote.com) that appears first.
     """
-    import textwrap  # Import at top to avoid UnboundLocalError
-    
     print(f"🔍 DEBUG: generate_timeline_animations called")
     print(f"   - code_content length: {len(code_content)} characters")
     print(f"   - timeline_events: {len(timeline_events) if timeline_events else 0} events")
@@ -1391,24 +1389,6 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
     if not timeline_events or len(timeline_events) == 0:
         print(f"   ⚠️  WARNING: No timeline events! Highlights will not be created!")
         return None
-    
-    # CRITICAL: Determine if we should use incremental reveal (Code Hike style)
-    # This must be determined EARLY so it's available throughout the function
-    # Short code (fits on screen) → Show all at once (current behavior)
-    # Long code (doesn't fit) → Build incrementally as blocks are narrated
-    use_incremental_reveal = False
-    
-    # Check code length to determine if we need incremental reveal
-    test_code_lines = code_content.strip().split('\n')
-    # Remove blank lines for accurate count
-    test_code_lines = [line for line in test_code_lines if line.strip()]
-    
-    if len(test_code_lines) > 18:  # Approximate threshold for scrolling
-        use_incremental_reveal = True
-        print(f"📖 Using Code Hike-style incremental reveal ({len(test_code_lines)} lines)")
-    else:
-        use_incremental_reveal = False
-        print(f"📄 Using standard display (code fits on screen, {len(test_code_lines)} lines)")
     
     # CRITICAL: Remove blank lines AND comments from code for cleaner display
     # But we need to map original line numbers to new line numbers
@@ -1487,26 +1467,20 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
             fade_out_all + final_wait
         )
         
-        # CRITICAL FIX: Use REASONABLE reading time, not audio-duration-based
-        # The audio file might be 50s, but narration ends at ~33s
-        # Use 2 seconds per point for reading (reasonable pace)
-        reading_time = len(overview_points) * 2.0
-        reading_time = max(reading_time, 2.0)  # Minimum 2s
+        reading_time = overview_duration - total_animation_time
+        reading_time = max(reading_time, 2.0)
         
         # This is the ACTUAL duration that will happen in the video
         actual_overview_duration = total_animation_time + reading_time
         
         print(f"\n🎬 Overview duration recalculation:")
-        print(f"   Passed-in audio duration: {overview_duration:.2f}s (IGNORED - contains silence)")
+        print(f"   Passed-in duration: {overview_duration:.2f}s")
         print(f"   Animation time: {total_animation_time:.2f}s")
-        print(f"   Reading time: {reading_time:.2f}s (2s per point)")
+        print(f"   Reading time: {reading_time:.2f}s")
         print(f"   ACTUAL duration: {actual_overview_duration:.2f}s")
-        print(f"   ✅ This matches when narration actually ends!")
         
-        # DISABLED: This recalculation was overriding our hardcoded timing
-        # We need overview_duration to stay at 32.4s (set earlier) so code appears at 33s
-        # overview_duration = actual_overview_duration
-        print(f"   ⚠️  Keeping hardcoded overview_duration = {overview_duration:.2f}s (not using calculated {actual_overview_duration:.2f}s)")
+        # Use the actual duration for all calculations
+        overview_duration = actual_overview_duration
     
     # ============================================================
     # HARDCODED VALUES EXPLANATION:
@@ -1526,32 +1500,11 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
     # (overview_duration + 1.1s): Code becomes VISIBLE and ready for highlighting
     #                             This is when we can START highlighting and scrolling
     # ============================================================
-    # CRITICAL: Calculate actual fixed_overhead including skeleton setup time
-    # For Code Hike style, we need to account for skeleton display
-    if use_incremental_reveal:
-        # USER REQUIREMENT: Narration starts at 33s, code displays at 36s (3s transition)
-        # fixed_overhead = overview_duration + 0.6s
-        # So overview_duration must be 35.4s to get code at 36s
-        overview_duration = 35.4
-        
-        # Skeleton setup time: title (0.5s) + wait (0.1s) = 0.6s
-        skeleton_setup_time = 0.5 + 0.1
-        
-        # fixed_overhead is when the skeleton FINISHES displaying
-        # This will be 35.4 + 0.6 = 36.0s
-        fixed_overhead = overview_duration + skeleton_setup_time
-        
-        # NO WAIT - Everything happens at 36s
-        # Code appears at 36s, highlight appears at 36s, narration starts at 36s
-        skeleton_sync_wait = 0.0 
-        
-        print(f"🕐 Skeleton sync: Forced overview_duration=35.4s")
-        print(f"   fixed_overhead: {fixed_overhead:.2f}s (Code appears at 36s)")
-    else:
-        # Standard display
-        fixed_overhead = overview_duration + 0.5 + 0.1 + 0.5  # Actual overview time + animations
-        skeleton_sync_wait = 0  # Not used
+    fixed_overhead = overview_duration + 0.5 + 0.1 + 0.5  # Actual overview time + animations
     
+    print(f"\n{'='*60}")
+    print("🔍 DEBUG: MANIM CODE GENERATION")
+    print(f"{'='*60}")
     print(f"fixed_overhead = {fixed_overhead:.2f}s")
     print(f"  Breakdown:")
     print(f"    - 0.0s - 20.0s: Overview/introduction period")
@@ -1828,8 +1781,6 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
     
     timeline_events.sort(key=lambda x: x['start_time'])
     animation_timeline = ""
-    # CRITICAL: current_time should NOT include skeleton_sync_wait
-    # because skeleton_sync_wait is a self.wait() in the Manim code, not part of fixed_overhead
     current_time = fixed_overhead
     previous_highlight_idx = None
     
@@ -1840,11 +1791,8 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
         start_time = event['start_time']
         end_time = event['end_time']
         block = event['code_block']
-
-        # NO FORCED SYNC - Use natural timing from audio
-        wait_time = start_time - current_time
         
-        # NO ADJUSTMENT NEEDED - skeleton_sync_wait is 0
+        wait_time = start_time - current_time
         
         print(f"Event {event_idx + 1}: {block['type']} (lines {block['start_line']}-{block['end_line']})")
         print(f"  Timeline event start_time: {start_time:.2f}s")
@@ -1989,90 +1937,7 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
         # Generate enhanced animation with glow, animated border, and spotlight effect
         # Animation sequence: scroll (0.3s) + glow fade-in (0.2s) + border draw (0.3s) + fill fade-in (0.2s) + pulse (0.4s) = 1.4s or 1.1s
         # CRITICAL: Embed code_scroll_time value directly (not as variable reference)
-        
-        if use_incremental_reveal:
-            # CODE HIKE STYLE: Reveal blocks progressively (code already set up in template)
-            # OPACITY STRATEGY:
-            # - Skeleton: Always white (1.0)
-            # - Previous blocks: White (1.0) - already explained
-            # - Current block: White (1.0) + highlighted - being explained
-            # - Upcoming blocks: Dim (0.15) - not yet explained
-            
-            # Reveal the specific lines for this event (progressive reveal)
-            animation_timeline += f"""            # CODE HIKE: Reveal block {event_idx + 1} (Lines {event_start_line_0indexed}-{event_end_line_0indexed})
-            
-            # Identify lines to reveal (bring from dim to full opacity)
-            lines_to_reveal = code_lines[{event_start_line_0indexed}:{event_end_line_0indexed + 1}]
-            
-            # CRITICAL: Also ensure ALL previous lines are white (cumulative reveal)
-            # This handles cases where timeline events don't cover every line
-            all_lines_up_to_current = code_lines[0:{event_end_line_0indexed + 1}]
-            
-            # Check for overflow and scroll UP if needed
-            target_bottom_y = code_lines[{event_end_line_0indexed}].get_bottom()[1]
-            
-            if target_bottom_y < -3.0:
-                shift_amount = -3.0 - target_bottom_y
-                # Shift the ENTIRE code_lines group
-                self.play(code_lines.animate.shift(UP * shift_amount), run_time=0.3)
-                self.total_scroll_shift += shift_amount
-            
-            # Reveal ALL lines from start to current block (cumulative)
-            # This ensures previous lines stay white even if not explicitly in a timeline event
-            self.play(all_lines_up_to_current.animate.set_opacity(1.0), run_time=0.5)
-            
-            # Position highlight for this block
-            # We surround the revealed lines
-            # Create a temporary VGroup of the target lines to get bounding box
-            target_group = VGroup(*lines_to_reveal)
-            target_center = target_group.get_center()
-            target_width = target_group.width
-            target_height = target_group.height
-            
-            highlight_{event_idx}.move_to(target_center)
-            highlight_{event_idx}.stretch_to_fit_width(target_width + 0.3)
-            highlight_{event_idx}.stretch_to_fit_height(target_height + 0.1)
-            
-            highlight_glow_{event_idx}.move_to(target_center)
-            highlight_glow_{event_idx}.stretch_to_fit_width(target_width + 0.3)
-            highlight_glow_{event_idx}.stretch_to_fit_height(target_height + 0.1)
-            
-            # Enhanced highlight animation sequence
-            # Step 1: Glow appears first (subtle background glow)
-            self.play(
-                highlight_glow_{event_idx}.animate.set_stroke_opacity(0.3),
-                run_time=0.2
-            )
-            # Step 2: Animated border drawing effect (stroke appears)
-            self.play(
-                highlight_{event_idx}.animate.set_stroke_opacity(0.9),
-                highlight_glow_{event_idx}.animate.set_stroke_opacity(0.5),
-                run_time=0.3
-            )
-            # Step 3: Fill fades in (background highlight)
-            self.play(
-                highlight_{event_idx}.animate.set_opacity(0.25).set_stroke_opacity(0.95),
-                highlight_glow_{event_idx}.animate.set_stroke_opacity(0.4),
-                run_time=0.2
-            )
-            # Step 4: Subtle pulse animation (breathing effect)
-            self.play(
-                highlight_{event_idx}.animate.set_opacity(0.20).set_stroke_opacity(0.85),
-                highlight_glow_{event_idx}.animate.set_stroke_opacity(0.3),
-                run_time=0.2
-            )
-            self.play(
-                highlight_{event_idx}.animate.set_opacity(0.28).set_stroke_opacity(0.95),
-                highlight_glow_{event_idx}.animate.set_stroke_opacity(0.45),
-                run_time=0.2
-            )
-            remaining_time = {highlight_duration:.2f} - 1.6
-            if remaining_time > 0:
-                self.wait(remaining_time)
-"""
-        else:
-            # STANDARD DISPLAY: Use scrolling for long code
-            animation_timeline += f"""            # Scroll only if needed (scroll_progress > 0 means actual scrolling)
+        animation_timeline += f"""            # Scroll only if needed (scroll_progress > 0 means actual scrolling)
             scroll_time = 0.3 if {scroll_progress:.3f} > 0 and scroll_distance > 0 else 0.0
             if {scroll_progress:.3f} > 0 and scroll_distance > 0:
                 seg_target_y = start_center_y + (scroll_distance * {scroll_progress:.3f})
@@ -2288,121 +2153,7 @@ def generate_timeline_animations(code_content, timeline_events, audio_duration, 
         
 """
     
-    # CRITICAL: Determine if we should use incremental reveal (Code Hike style)
-    # Short code (fits on screen) → Show all at once (current behavior)
-    # Long code (doesn't fit) → Build incrementally as blocks are narrated
-    use_incremental_reveal = False
-    
-    # Check if code will need scrolling (indicates long code)
-    # We'll create a test Text object to measure height
-    test_code_lines = cleaned_code.split('\n')
-    if len(test_code_lines) > 18:  # Approximate threshold for scrolling
-        use_incremental_reveal = True
-        print(f"📖 Using Code Hike-style incremental reveal ({len(test_code_lines)} lines)")
-    else:
-        print(f"📄 Using standard display (code fits on screen, {len(test_code_lines)} lines)")
-    
-    if use_incremental_reveal:
-        # CODE HIKE STYLE: Build code incrementally
-        # CRITICAL: animation_timeline has 12-space indentation (for nested blocks)
-        # but Code Hike needs 8-space indentation (direct in construct())
-        # We can't use textwrap.dedent because injected code might have 0 indentation (inside strings)
-        # So we manually strip 4 spaces from lines that have them (12 -> 8)
-        indented_animation_timeline = "\n".join([line[4:] if line.startswith("    ") else line for line in animation_timeline.split("\n")])
-        
-        code = f"""from manim import *
-
-class CodeExplanationScene(Scene):
-    def construct(self):
-{overview_slides_code}        
-        title = Text("Code Explanation", font_size=38, font="Helvetica", weight=BOLD, color=BLUE)
-        title.to_edge(UP, buff=0.4)
-        self.play(Write(title), run_time=0.5)
-        self.wait(0.1)
-        
-        # CODE HIKE SETUP: Pre-build all code lines IMMEDIATELY (no delay)
-        code_lines = VGroup()
-        raw_lines = \"\"\"{escaped_code}\"\"\".split('\\n')
-        for line in raw_lines:
-            # Use non-breaking spaces to preserve indentation
-            formatted_line = line.replace(" ", "\\u00A0")
-            t = Text(
-                formatted_line, 
-                font_size=24, 
-                font="Courier", 
-                color=WHITE,
-                line_spacing=1.0
-            )
-            # Scale if too wide
-            if t.width > 12:
-                t.scale_to_fit_width(12)
-            code_lines.add(t)
-        
-        # Arrange vertically - GUARANTEES vertical stacking
-        code_lines.arrange(DOWN, aligned_edge=LEFT, buff=0.1)
-        
-        # Position the whole group at Top-Left
-        code_lines.to_edge(UP, buff=2.5)
-        code_lines.to_edge(LEFT, buff=0.5)
-        
-        self.add(code_lines)
-        
-        # SKELETON-FIRST STRATEGY: Show ONLY class/method structure (no variables, no loops)
-        # Skeleton = class declaration, method signature, and final closing braces ONLY
-        skeleton_indices = []
-        for idx, line in enumerate(raw_lines):
-            stripped = line.strip()
-            indent_level = len(line) - len(line.lstrip())
-            
-            # STRICT skeleton: ONLY top-level (0 indent) OR specific keywords
-            is_skeleton = False
-            
-            # Top-level declarations (0 indentation)
-            if indent_level == 0:
-                is_skeleton = True
-            # Method signatures (contains 'public static void main' or 'public class')
-            elif 'public static void main' in stripped or 'public class' in stripped:
-                is_skeleton = True
-            # Closing braces at the very end (last 3 lines of code)
-            elif idx >= len(raw_lines) - 3 and stripped in ['{{}}', '{{}}}}']:
-                is_skeleton = True
-            
-            if is_skeleton:
-                skeleton_indices.append(idx)
-        
-        # Show skeleton immediately (full opacity)
-        for idx in skeleton_indices:
-            code_lines[idx].set_opacity(1.0)
-        
-        # Dim all other lines (will be revealed progressively)
-        for idx in range(len(raw_lines)):
-            if idx not in skeleton_indices:
-                code_lines[idx].set_opacity(0.15)  # Very dim, but visible
-        
-        # Initialize scroll tracker
-        self.total_scroll_shift = 0.0
-        
-        # Wait to sync with first timeline event (narration start)
-        {"self.wait(" + str(skeleton_sync_wait) + ")" if skeleton_sync_wait > 0 else "# No wait needed - immediate sync"}
-
-        
-{highlight_creation}
-        
-{indented_animation_timeline}
-        
-        # Fade out all code blocks and title
-        self.play(FadeOut(code_lines), FadeOut(title), run_time=0.5)
-        self.wait(0.2)
-        
-{concepts_slide_code}
-        
-        # Ensure video duration matches audio duration
-        if {remaining_time_after_all:.2f} > 0:
-            self.wait({remaining_time_after_all:.2f})
-"""
-    else:
-        # STANDARD DISPLAY: Show all code at once (short code)
-        code = f"""from manim import *
+    code = f"""from manim import *
 
 class CodeExplanationScene(Scene):
     def construct(self):
@@ -2979,95 +2730,248 @@ def code_to_video(code_content: str, output_name: str = "output", audio_language
             print(f"   ✅ Animation type: {animation_type}")
             print(f"   ✅ Key steps: {len(key_steps)}")
             
-            # STEP 2: USE TEMPLATE-BASED GENERATION (Reliable & Professional)
-            print("   Step 2: Using template-based overview (guaranteed quality)...")
+            # PROMPT CHAIN STEP 2: Generate Manim animation code
+            print("   Step 2: Generating Manim animation code...")
             
-            # Import template generator
-            try:
-                from overview_templates import generate_template_overview
-            except ImportError:
-                # Fallback if file not found (should not happen as we created it)
-                print("   ⚠️  Template module not found, creating inline...")
-                def generate_template_overview(animation_type, visual_concept, key_steps, duration):
-                    return (f"""# Fallback template
-title = Text("{visual_concept[:40]}", font_size=36, color=BLUE).to_edge(UP)
+            # Determine max steps and duration based on CODE LENGTH and complexity
+            # Count lines in code to determine if scrolling will be needed
+            code_lines = len([line for line in code_content.split('\n') if line.strip()])
+            needs_scrolling = code_lines > 18  # Threshold for scrolling
+            
+            if needs_scrolling:
+                # LONG CODE: 25-30 seconds for proper context
+                print(f"   📏 Long code detected ({code_lines} lines) - using extended overview duration")
+                if complexity == "simple":
+                    max_steps = 4
+                    target_duration = "22-25 seconds"
+                elif complexity == "complex":
+                    max_steps = 5
+                    target_duration = "28-32 seconds"
+                else:
+                    max_steps = 4
+                    target_duration = "25-28 seconds"
+            else:
+                # SHORT CODE: 10-15 seconds is sufficient
+                print(f"   📏 Short code detected ({code_lines} lines) - using standard overview duration")
+                if complexity == "simple":
+                    max_steps = 3
+                    target_duration = "10-12 seconds"
+                elif complexity == "complex":
+                    max_steps = 4
+                    target_duration = "14-16 seconds"
+                else:
+                    max_steps = 3
+                    target_duration = "12-14 seconds"
+            
+            animation_code_response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""You are an expert Manim animator. Create VISUAL, engaging animations that SHOW the concept, not just describe it.
+
+CRITICAL REQUIREMENTS FOR RELIABILITY:
+1. Generate ONLY the animation code (no class definition, no imports)
+2. Code should be FLUSH LEFT (NO INDENTATION) - start at column 0
+3. Use these Manim objects: Text, Circle, Square, Rectangle, VGroup, Dot, Line, Arrow
+4. Use these animations: Write, FadeIn, FadeOut, Create, GrowFromCenter
+5. MAXIMUM {max_steps} VISUAL STEPS - show the concept with shapes/diagrams
+6. NO LOOPS (for/while) - if showing multiple items, create them explicitly (max 5 items)
+7. VISUAL FOCUS:
+   - Use shapes to represent data structures (Rectangles for arrays, Circles for nodes, etc.)
+   - Show transformations and relationships with arrows/lines
+   - Combine text labels with visual elements
+   - Make it educational and clear
+8. PREVENT OVERLAPPING:
+   - Use explicit .move_to() or .shift() for EVERY element
+   - Space elements at least 1.0 units apart
+   - Use VGroup().arrange(RIGHT/DOWN, buff=0.5) for multiple items
+9. CLEAN TRANSITIONS: FadeOut old elements before showing new ones
+10. FINAL CLEANUP: End with self.play(FadeOut(Group(*self.mobjects)))
+
+11. **CRITICAL DURATION REQUIREMENT: {target_duration}**
+    - The animation MUST fill the ENTIRE {target_duration}
+    - Use run_time=1.5-2.0 for each self.play() call
+    - Add self.wait(2-4) between EVERY major step
+    - For {target_duration}, you need substantial pauses to let viewers absorb information
+    - Example timing for 30s: Title (2s) + Step 1 (6s) + Step 2 (6s) + Step 3 (6s) + Step 4 (6s) + Cleanup (2s) = 28-30s
+    - DO NOT rush through steps - give each step time to be understood
+    
+12. Colors: BLUE, GREEN, YELLOW, ORANGE, WHITE, PURPLE
+
+EXAMPLE STRUCTURE for 30-second animation:
+title = Text("Bank Account Threading", font_size=32, color=BLUE).to_edge(UP)
 self.play(Write(title), run_time=1.5)
-self.wait({duration - 3.0})
+self.wait(2)  # Let title be read
+
+# Step 1 - Show account (6 seconds total)
+account = Rectangle(width=3, height=1.5, color=WHITE).shift(UP*0.5)
+label = Text("Balance: 1000", font_size=24, color=YELLOW).move_to(account)
+self.play(Create(account), Write(label), run_time=2)
+self.wait(3)  # Pause to absorb
+
+# Step 2 - Show threads (6 seconds total)
+thread1 = Circle(radius=0.5, color=GREEN).shift(LEFT*2 + DOWN)
+t1_label = Text("Thread 1", font_size=20).next_to(thread1, DOWN)
+self.play(GrowFromCenter(thread1), Write(t1_label), run_time=2)
+self.wait(3)  # Pause
+
+# Continue with more steps...
 self.play(FadeOut(Group(*self.mobjects)), run_time=1.5)
-""", "This code demonstrates a programming concept.")
+
+Return ONLY the animation code, flush left."""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Create a VISUAL Manim animation for: {visual_concept}
+
+Show these {min(len(key_steps), max_steps)} key steps VISUALLY:
+{chr(10).join(f"{i+1}. {step}" for i, step in enumerate(key_steps[:max_steps]))}
+
+CRITICAL REQUIREMENTS:
+- MUST fill the ENTIRE {target_duration} with content
+- Use run_time=1.5-2.0 for animations
+- Add wait(2-4) between EVERY step
+- Show the concept with shapes/diagrams, not just text
+- {max_steps} visual steps maximum
+- Clear spacing and positioning
+- DO NOT rush - let each step breathe
+
+Generate the animation code (FLUSH LEFT, no class definition)."""
+                    }
+                ],
+                temperature=0.4,  # Slightly higher for creativity but still controlled
+                max_tokens=1500  # Increased to allow for visual elements
+            )
             
-            # CRITICAL FIX: Template overview is not respecting duration
-            # It's generating animations that take WAY longer than target_overview_duration
-            # SOLUTION: Use simple wait instead of complex template
+            overview_animation_code = animation_code_response.choices[0].message.content.strip()
             
-            target_overview_duration = 33.0
-            print(f"   📏 Using SIMPLE overview (33s wait) - template was causing timing issues")
+            # Clean up the code if it has markdown formatting
+            if "```python" in overview_animation_code:
+                overview_animation_code = overview_animation_code.split("```python")[1].split("```")[0].strip()
+            elif "```" in overview_animation_code:
+                overview_animation_code = overview_animation_code.split("```")[1].split("```")[0].strip()
             
-            # Animated pyramid overview - EXACTLY 33 seconds
-            overview_animation_code = '''# Pyramid Overview - Exact 33s duration
-# Title (2s)
-title = Text("Pyramid Pattern with Nested Loops", font_size=36, color=BLUE).to_edge(UP)
-self.play(Write(title), run_time=1.5)
-self.wait(0.5)
-
-# Explanation (2.5s)
-explain = Text("Outer loop controls rows, Inner loops control numbers", font_size=20, color=WHITE).next_to(title, DOWN, buff=0.5)
-self.play(Write(explain), run_time=2.0)
-self.wait(0.5)
-
-# Build pyramid row by row with labels (24.5s total for 5 rows)
-# Row 1 (4.5s)
-row1 = Text("1", font_size=32, color=YELLOW).shift(UP*1.5)
-row1_label = Text("Row 1: 1 number", font_size=18, color=GREEN).next_to(row1, LEFT, buff=0.5)
-self.play(Write(row1), Write(row1_label), run_time=2.0)
-self.wait(2.5)
-
-# Row 2 (4.5s)
-row2 = VGroup(Text("1", font_size=32, color=YELLOW), Text("2", font_size=32, color=YELLOW)).arrange(RIGHT, buff=0.3).shift(UP*0.7)
-row2_label = Text("Row 2: 2 numbers", font_size=18, color=GREEN).next_to(row2, LEFT, buff=0.5)
-self.play(FadeIn(row2), Write(row2_label), run_time=2.0)
-self.wait(2.5)
-
-# Row 3 (4.5s)
-row3 = VGroup(*[Text(str(i), font_size=32, color=YELLOW) for i in range(1, 4)]).arrange(RIGHT, buff=0.3).shift(DOWN*0.1)
-row3_label = Text("Row 3: 3 numbers", font_size=18, color=GREEN).next_to(row3, LEFT, buff=0.5)
-self.play(FadeIn(row3), Write(row3_label), run_time=2.0)
-self.wait(2.5)
-
-# Row 4 (4.5s)
-row4 = VGroup(*[Text(str(i), font_size=28, color=YELLOW) for i in range(1, 5)]).arrange(RIGHT, buff=0.25).shift(DOWN*0.9)
-row4_label = Text("Row 4: 4 numbers", font_size=18, color=GREEN).next_to(row4, LEFT, buff=0.5)
-self.play(FadeIn(row4), Write(row4_label), run_time=2.0)
-self.wait(2.5)
-
-# Row 5 (4.5s)
-row5 = VGroup(*[Text(str(i), font_size=24, color=YELLOW) for i in range(1, 6)]).arrange(RIGHT, buff=0.2).shift(DOWN*1.7)
-row5_label = Text("Row 5: 5 numbers", font_size=18, color=GREEN).next_to(row5, LEFT, buff=0.5)
-self.play(FadeIn(row5), Write(row5_label), run_time=2.0)
-self.wait(2.5)
-
-# Highlight pattern (2s)
-all_rows = VGroup(row1, row2, row3, row4, row5)
-highlight = SurroundingRectangle(all_rows, color=GREEN, buff=0.3, stroke_width=2)
-self.play(Create(highlight), run_time=1.5)
-self.wait(0.5)
-
-# Extra wait to reach exactly 33s (2s)
-self.wait(2.0)
-
-# Fade out (2s)
-self.play(FadeOut(Group(*self.mobjects)), run_time=2.0)
-'''
+            # CRITICAL: Fix common indexing errors in list comprehensions
+            # Pattern: [... for i in [1, 2, 3, 4, 5]] should be [... for i in range(5)]
+            # Pattern: array[i] where i in [1,2,3,4,5] causes IndexError
+            import re
             
-            overview_narration = """Welcome to this code explanation. Today we'll explore a pyramid pattern created using nested loops. The outer loop controls the rows of our pyramid, while the inner loops control the numbers in each row. Row one contains just the number one. Row two contains numbers one and two. Row three has one, two, and three. This pattern continues, with each row displaying numbers from one up to the current row number, creating a triangular pyramid shape. Now let's examine the actual code."""
+            # Fix: [... for i in [1, 2, 3, ...]] -> [... for i in range(N)]
+            def fix_list_comprehension_indices(code):
+                # Find patterns like: for i in [1, 2, 3, 4, 5]
+                pattern = r'for\s+(\w+)\s+in\s+\[(\d+(?:\s*,\s*\d+)+)\]'
+                
+                def replace_with_range(match):
+                    var_name = match.group(1)
+                    numbers_str = match.group(2)
+                    numbers = [int(n.strip()) for n in numbers_str.split(',')]
+                    
+                    # Check if it's a sequence starting from 1
+                    if numbers == list(range(1, len(numbers) + 1)):
+                        # Replace with range(len)
+                        return f'for {var_name} in range({len(numbers)})'
+                    elif numbers == list(range(len(numbers))):
+                        # Already correct, but use range anyway
+                        return f'for {var_name} in range({len(numbers)})'
+                    else:
+                        # Keep as is if it's not a simple sequence
+                        return match.group(0)
+                
+                fixed_code = re.sub(pattern, replace_with_range, code)
+                return fixed_code
             
-            calculated_overview_duration = target_overview_duration
-            print(f"   ✅ Simple overview generated ({len(overview_animation_code)} chars, {target_overview_duration}s)")
-            print(f"   ✅ Narration generated ({len(overview_narration)} chars)")
+            overview_animation_code = fix_list_comprehension_indices(overview_animation_code)
+            
+            print(f"   ✅ Animation code generated ({len(overview_animation_code)} chars)")
+            
+            # FIXED DURATIONS - Simple and reliable
+            if needs_scrolling:
+                # LONG CODE: Always 30 seconds
+                target_overview_duration = 30.0
+                print(f"   📏 Long code ({code_lines} lines) - FIXED 30s overview")
+            else:
+                # SHORT CODE: Always 15 seconds  
+                target_overview_duration = 15.0
+                print(f"   📏 Short code ({code_lines} lines) - FIXED 15s overview")
+            
+            # SIMPLE APPROACH: Estimate animation time from code, then pad to target
+            print(f"   ⏱️  Estimating animation duration from generated code...")
+            
+            # Count up all run_time and wait() calls in the generated code
+            import re
+            run_times = re.findall(r'run_time\s*=\s*([\d.]+)', overview_animation_code)
+            waits = re.findall(r'self\.wait\(([\d.]+)\)', overview_animation_code)
+            
+            estimated_duration = sum(float(t) for t in run_times) + sum(float(w) for w in waits)
+            print(f"   📊 Estimated duration from code: {estimated_duration:.1f}s")
+            print(f"      - run_time calls: {len(run_times)} totaling {sum(float(t) for t in run_times):.1f}s")
+            print(f"      - wait() calls: {len(waits)} totaling {sum(float(w) for w in waits):.1f}s")
+            
+            # Calculate how much padding we need
+            if estimated_duration < target_overview_duration:
+                padding_needed = target_overview_duration - estimated_duration
+                print(f"   ➕ Need to add {padding_needed:.1f}s padding to reach {target_overview_duration}s")
+                
+                # Add padding BEFORE the final FadeOut
+                if "FadeOut(Group(*self.mobjects))" in overview_animation_code:
+                    overview_animation_code = overview_animation_code.replace(
+                        "self.play(FadeOut(Group(*self.mobjects)))",
+                        f"self.wait({padding_needed:.1f})\nself.play(FadeOut(Group(*self.mobjects)))"
+                    )
+                    print(f"   ✅ Added wait({padding_needed:.1f}) before final FadeOut")
+                else:
+                    # No FadeOut found, add at the end
+                    overview_animation_code += f"\nself.wait({padding_needed:.1f})"
+                    print(f"   ✅ Added wait({padding_needed:.1f}) at end of animation")
+                
+                calculated_overview_duration = target_overview_duration
+            else:
+                # Animation is already long enough
+                calculated_overview_duration = estimated_duration + 1.0
+                print(f"   ℹ️  Animation already {estimated_duration:.1f}s, using {calculated_overview_duration:.1f}s")
+            
             print(f"   📊 FINAL Overview Duration: {calculated_overview_duration:.1f}s")
             
-            # Skip AI narration generation - we have template narration
-            print(f"   ⏭️  Skipping AI narration (using template narration)")
+            # PROMPT CHAIN STEP 3: Generate narration for the animation
+            print("   Step 3: Creating narration for animation...")
+            
+            # Calculate realistic word count (2.5 words per second)
+            target_words = int(calculated_overview_duration * 2.5)
+            
+            overview_narration_response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": f"""Create engaging narration for a code visualization animation.
+
+The narration should:
+1. Explain what the code does
+2. Match the visual animation timing
+3. Be {target_words} words maximum ({int(calculated_overview_duration)} seconds of speech)
+4. Be natural and conversational
+5. Build excitement about the code
+
+Keep it concise and engaging!"""
+                    },
+                    {
+                        "role": "user",
+                        "content": f"""Create narration for this visualization:
+
+Visual concept: {visual_concept}
+Key steps: {', '.join(key_steps)}
+Duration: {calculated_overview_duration:.1f} seconds
+
+Make it engaging and match the animation timing. Maximum {target_words} words."""
+                    }
+                ],
+                temperature=0.7,
+                max_tokens=int(target_words * 1.5)
+            )
+            
+            overview_narration = overview_narration_response.choices[0].message.content.strip()
+            print(f"   ✅ Narration created ({len(overview_narration)} chars, ~{len(overview_narration.split())} words)")
             
             # Store the animation code for later use
             overview_points = key_steps  # Keep for compatibility
@@ -3155,16 +3059,34 @@ self.play(FadeOut(Group(*self.mobjects)), run_time=2.0)
             # ============================================================
             
             # RECALCULATE overview_duration to match actual Manim timing
-            # RECALCULATE overview_duration to match actual Manim timing
             if len(overview_points) > 0:
-                # USER REQUIREMENT: Overview ends at 33s, 3s transition, code+narration at 36s
-                # We must ensure the audio track has 36s of "intro" (overview + silence)
-                # before the first block narration starts.
-                pass 
+                title_write = 0.6
+                subtitle_fade = 0.4
+                wait_after_subtitle = 0.2
+                fade_in_per_point = 0.5
+                fade_out_all = 0.6
+                final_wait = 0.2
+                
+                total_animation_time = (
+                    title_write + subtitle_fade + wait_after_subtitle +
+                    (len(overview_points) * fade_in_per_point) +
+                    fade_out_all + final_wait
+                )
+                
+                reading_time = overview_duration - total_animation_time
+                reading_time = max(reading_time, 2.0)
+                
+                actual_overview_duration = total_animation_time + reading_time
+                
+                print(f"\n🎬 Recalculating overview duration for intro_delay:")
+                print(f"   Audio duration: {overview_duration:.2f}s")
+                print(f"   Animation time: {total_animation_time:.2f}s")
+                print(f"   Reading time: {reading_time:.2f}s")
+                print(f"   ACTUAL overview duration: {actual_overview_duration:.2f}s")
+                
+                overview_duration = actual_overview_duration
             
-            # FORCE intro_delay to 36.0s
-            intro_delay = 36.0
-            print(f"🎤 Audio Sync: Forced intro_delay = {intro_delay:.2f}s (Narration starts at 36s)")
+            intro_delay = overview_duration + 0.5 + 0.1 + 0.5  # Actual overview time + animations
             
             print(f"\n{'='*60}")
             print("🔍 DEBUG: TIMELINE CONSTRUCTION")
@@ -3175,15 +3097,13 @@ self.play(FadeOut(Group(*self.mobjects)), run_time=2.0)
             print(f"Starting cumulative_time = {cumulative_time}s\n")
             
             # CRITICAL: Iterate over ALL blocks for narration
-            # DO NOT SKIP - User wants all narration included
             for block_idx, code_block in enumerate(all_blocks_for_narration):
-
                 block_type = code_block.get('type', 'code_block')
                 block_code = code_block.get('code', '')
                 start_line = code_block.get('start_line', 0)
                 end_line = code_block.get('end_line', 0)
                 
-                print(f"\nProcessing Block {block_idx + 1}/{len(all_blocks_for_narration)}: {block_type} (lines {start_line}-{end_line})")
+                print(f"Block {block_idx + 1}/{len(all_blocks_for_narration)}: {block_type} (lines {start_line}-{end_line})")
                 print(f"   🔍 DEBUG: Block index: {block_idx}, Total narration blocks: {len(all_blocks_for_narration)}, Total highlight blocks: {len(blocks_for_highlights)}")
                 print(f"   🔍 DEBUG: Block code preview: {block_code[:100]}...")
                 
@@ -3273,7 +3193,7 @@ Provide a BRIEF overview (under 200 characters) mentioning it contains inner blo
                 - Start by explicitly mentioning the block type: "This {block_type_name}..." or "The {block_type_name}..."
                 - Do NOT mention what the entire code does
                 - Do NOT give an overview or introduction
-                - Do NOT say "this code" or "the program" without specifying it\'s a {block_type_name}
+                - Do NOT say "this code" or "the program" without specifying it's a {block_type_name}
                 - Focus ONLY on what THIS specific {block_type_name} does
                 - Start directly: "This {block_type_name}..." or "The {block_type_name}..."
 
@@ -3731,13 +3651,15 @@ Make it natural and concise. Start with "Key concepts include..." or similar."""
                     print(f"   This is when the LAST highlight actually ends (including extensions)")
                     
                     # Key concepts audio starts immediately after code highlights end
-                    # Add 0.7s transition time (actual Manim animation time):
+                    # Add 2.7s transition time to ensure proper gap:
+                    #   - 0.2s: Final highlight fade-out
                     #   - 0.5s: Code and title fade-out
                     #   - 0.2s: Small wait
-                    # Total: 0.7s
-                    key_concepts_start_time = actual_code_end_time + 0.7
+                    #   - 1.8s: Extra buffer for safety (accounts for any animation delays)
+                    # Total: 2.7s
+                    key_concepts_start_time = actual_code_end_time + 2.7
                     print(f"   ✅ Key concepts start at {key_concepts_start_time:.2f}s")
-                    print(f"      (Last highlight ends at {actual_code_end_time:.2f}s + 0.7s transition)\n")
+                    print(f"      (Last highlight ends at {actual_code_end_time:.2f}s + 2.7s transition)\n")
                 else:
                     print(f"   ⚠️  No timeline events - cannot calculate key concepts start time\n")
             
