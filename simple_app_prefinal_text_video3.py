@@ -215,38 +215,14 @@ def generate_slides_code(parsed_data, audio_duration=None, num_sections=None, se
     title = parsed_data.get("title", "Presentation")
     sections = parsed_data.get("sections", [])
     
-    # Handle long titles by wrapping into multiple lines
-    import textwrap
-    if len(title) > 50:
-        # Wrap title into multiple lines (max 50 chars per line)
-        title_lines = textwrap.wrap(title, width=50)
-        # Create VGroup of text lines
-        title_code = f"""        # Title (multi-line for long text)
-        title_lines = VGroup()
-"""
-        for idx, line in enumerate(title_lines):
-            escaped_line = line.replace('"', '\\"')
-            title_code += f"""        title_line_{idx} = Text(
-            "{escaped_line}",
-            font_size=32,
-            font="Helvetica",
-            weight=BOLD,
-            gradient=(BLUE, GREEN)
-        )
-        title_lines.add(title_line_{idx})
-"""
-        title_code += """        title_lines.arrange(DOWN, buff=0.2)
-        title_lines.to_edge(UP, buff=0.4)
-        self.play(Write(title_lines), run_time=0.5)
-        self.wait(1)
+    code = """from manim import *
+
+class EducationalScene(Scene):
+    def construct(self):
+        # Initial wait
+        self.wait(1.2)
         
-        # Reference for sections to use
-        title_ref = title_lines
-        
-"""
-    else:
-        # Short title - use single line
-        title_code = f"""        # Title
+        # Title
         title = Text(
             \"\"\"{title}\"\"\",
             font_size=38,
@@ -258,19 +234,7 @@ def generate_slides_code(parsed_data, audio_duration=None, num_sections=None, se
         self.play(Write(title), run_time=0.5)
         self.wait(1)
         
-        # Reference for sections to use
-        title_ref = title
-        
-"""
-    
-    code = """from manim import *
-
-class EducationalScene(Scene):
-    def construct(self):
-        # Initial wait
-        self.wait(1.2)
-        
-""" + title_code
+""".format(title=title)
     
     # Generate code for each section
     for idx, section in enumerate(sections):
@@ -334,7 +298,7 @@ class EducationalScene(Scene):
             weight=BOLD,
             color=BLUE
         )
-        heading_{idx}.next_to(title_ref, DOWN, buff=0.7)
+        heading_{idx}.next_to(title, DOWN, buff=0.7)
         self.play(FadeIn(heading_{idx}), run_time=0.5)
         self.wait(0.5)
         
@@ -4891,51 +4855,35 @@ class MixedScene(Scene):
     return code
 
 
-def generate_ai_animation_for_concept(concept, narration, target_duration, client):
+def generate_ai_animation_for_concept(concept, target_duration, client):
     """Generate Manim animation code using AI (like code overview)"""
     
-    prompt = f"""
-    You are a Manim Animation Expert. Generate Python code using ManimCE to visualize the following concept.
-    
-    CONCEPT: {concept}
-    NARRATION: "{narration}"
-    DURATION: {target_duration} seconds
-    
-    CRITICAL RULES:
-    1. **MATCH NARRATION EXACTLY**: 
-       - If narration says "top to bottom", use `.arrange(DOWN)`.
-       - If narration says "left to right", use `.arrange(RIGHT)`.
-       - If narration lists items "1, 2, 3", show them in that EXACT order.
-       - Do NOT reverse the order unless explicitly told to.
-    
-    2. **NO TEXT OVERFLOW**:
-       - If text is long, do NOT put it inside a small box. Place it BELOW or NEXT TO the box.
-       - If a label is wider than its container, move it OUTSIDE.
-       - Use `font_size=32` or larger for important labels.
-    
-    3. **VISUAL CLARITY**:
-       - Use VIBRANT colors (BLUE, GREEN, YELLOW, RED).
-       - NEVER use default white lines.
-       - Make arrows THICK (`stroke_width=6`).
-       - Make text BIG and BOLD.
-    
-    4. **CODE STRUCTURE**:
-       - Return ONLY the Python code inside a `def construct(self):` method.
-       - Do NOT include `class` or `import` statements (I will add them).
-       - Do NOT use `self.wait()` at the start. Start animating IMMEDIATELY.
-    
-    Example of Good Logic:
-    ```python
-    # If narration says "Stack grows from bottom to top"
-    stack = VGroup()
-    for i in range(3):
-        item = VGroup(Rectangle(...), Text(...))
-        # New items go ON TOP
-        if len(stack) > 0:
-            item.next_to(stack[-1], UP, buff=0)
-        stack.add(item)
-    ```
-    """
+    prompt = f"""Generate Manim code to visualize: {concept}
+
+Target duration: {target_duration:.1f} seconds
+
+RULES:
+1. Create visual elements (circles, boxes, arrows, text)
+2. Use colors: BLUE, GREEN, YELLOW, RED, ORANGE
+3. Arrange horizontally when possible
+4. Use .next_to() to prevent overlap
+5. Add descriptive labels
+6. Return ONLY animation code (no class/def)
+7. Code should be FLUSH-LEFT (no indentation)
+8. Duration must be EXACTLY {target_duration:.1f}s
+
+Example structure:
+```
+# Visual elements
+circle1 = Circle(radius=0.8, color=GREEN)
+label1 = Text("Label", font_size=24).next_to(circle1, DOWN)
+self.play(Create(circle1), Write(label1), run_time=1.5)
+self.wait(0.5)
+# ... more elements
+self.wait(X.X)  # Fill to reach {target_duration:.1f}s total
+```
+
+Return ONLY the animation code:"""
 
     response = client.chat.completions.create(
         model="gpt-4o",
@@ -5070,75 +5018,31 @@ Generate 3-4 slides."""
         
         # Animation slides only (no text slides)
         for idx, slide in enumerate(structure.get('animation_slides', [])):
-            # 1. Generate TTS as MP3 first (safest format from APIs)
-            raw_tts_file = f"{output_name}_anim_{idx}_raw.mp3"
-            generate_audio_for_language(slide.get('narration', ''), audio_language, raw_tts_file, client)
+            audio_file = f"{output_name}_anim_{idx}.aiff"
+            generate_audio_for_language(slide.get('narration', ''), audio_language, audio_file, client)
+            dur = get_audio_duration(audio_file)
             
-            # 2. Convert to standardized WAV (PCM s16le, 44100Hz, Stereo)
-            narration_wav = f"{output_name}_anim_{idx}_narration.wav"
-            subprocess.run([
-                "ffmpeg", "-y", "-i", raw_tts_file,
-                "-acodec", "pcm_s16le", "-ar", "44100", "-ac", "2",
-                narration_wav
-            ], check=True, capture_output=True)
-            
-            # Get narration duration
-            narration_dur = get_audio_duration(narration_wav)
-            if narration_dur is None:
+            # Handle case when audio duration cannot be determined
+            if dur is None:
+                # Estimate duration from text length (rough: 150 words per minute = 2.5 words per second)
                 narration_text = slide.get('narration', '')
                 word_count = len(narration_text.split())
-                narration_dur = word_count / 2.5
-                print(f"   ⚠️  Could not get audio duration, estimating: {narration_dur:.2f}s")
+                dur = word_count / 2.5
+                print(f"   ⚠️  Could not get audio duration, estimating: {dur:.2f}s")
             
-            # 3. Create silence padding if needed (also as standardized WAV)
-            if idx == 0:
-                audio_file = narration_wav
-                total_dur = narration_dur
-            else:
-                silence_wav = f"{output_name}_anim_{idx}_silence.wav"
-                subprocess.run([
-                    "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-                    "-t", "2.5", "-c:a", "pcm_s16le", silence_wav
-                ], check=True, capture_output=True)
-                
-                # Combine silence + narration (WAV + WAV = Clean WAV)
-                audio_file = f"{output_name}_anim_{idx}.wav"
-                subprocess.run([
-                    "ffmpeg", "-y",
-                    "-i", silence_wav,
-                    "-i", narration_wav,
-                    "-filter_complex", "[0:a][1:a]concat=n=2:v=0:a=1[out]",
-                    "-map", "[out]",
-                    audio_file
-                ], check=True, capture_output=True)
-                
-                # Cleanup temp files
-                if os.path.exists(silence_wav): os.remove(silence_wav)
-                if os.path.exists(narration_wav): os.remove(narration_wav)
-                
-                total_dur = 2.5 + narration_dur
-            
-            # Cleanup raw TTS
-            if os.path.exists(raw_tts_file): os.remove(raw_tts_file)
-            
-            # Store NARRATION duration for animation timing (not total duration)
-            durations.append(('animation', narration_dur))
+            durations.append(('animation', dur))
             audio_files.append(audio_file)
-            print(f"   Animation {idx + 1}: {narration_dur:.2f}s")
+            print(f"   Animation {idx + 1}: {dur:.2f}s")
         
         # Combine with 4s silence at start for title
         print("\n🎵 Combining audio...")
         audio_file = f"{output_name}_audio.mp3"
         
-        # Combine with 4s silence at start for title
-        print("\n🎵 Combining audio...")
-        audio_file = f"{output_name}_audio.mp3"
-        
-        # Create 4s silence for title (Standardized WAV)
-        silence_file = f"{output_name}_silence.wav"
+        # Create 4s silence for title
+        silence_file = f"{output_name}_silence.mp3"
         subprocess.run([
             "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-            "-t", "4", "-c:a", "pcm_s16le", silence_file
+            "-t", "4", "-c:a", "libmp3lame", silence_file
         ], check=True, capture_output=True)
         
         # Combine: silence + animation audios
@@ -5146,10 +5050,8 @@ Generate 3-4 slides."""
         with open(concat_file, 'w') as f:
             f.write(f"file '{silence_file}'\n")
             for audio in audio_files:
-                print(f"   DEBUG: Adding to concat: {audio} (exists: {os.path.exists(audio)})")
                 f.write(f"file '{audio}'\n")
         
-        # Concat all WAVs and output as MP3
         subprocess.run([
             "ffmpeg", "-y", "-f", "concat", "-safe", "0",
             "-i", concat_file, "-c:a", "libmp3lame", "-b:a", "192k", audio_file
@@ -5174,17 +5076,11 @@ Generate 3-4 slides."""
         with open(scene_file, 'w') as f:
             f.write(manim_code)
         
-        try:
-            subprocess.run([
-                sys.executable, "-m", "manim", "-pqh", scene_file, "FixedScene"
-            ], check=True, capture_output=True)
-        except subprocess.CalledProcessError as e:
-            print(f"❌ Manim Rendering Failed!")
-            print(f"STDOUT:\n{e.stdout.decode()}")
-            print(f"STDERR:\n{e.stderr.decode()}")
-            raise e
+        subprocess.run([
+            "venv/bin/python", "-m", "manim", "-pql", scene_file, "FixedScene"
+        ], check=True, capture_output=True)
         
-        video_path = f"media/videos/{scene_file.replace('.py', '')}/1080p60/FixedScene.mp4"
+        video_path = f"media/videos/{scene_file.replace('.py', '')}/480p15/FixedScene.mp4"
         
         # Step 5: Combine
         print("🎵 Combining video + audio...")
@@ -5221,12 +5117,8 @@ def generate_fixed_slides_code(structure, durations, client):
     
     code = f"""from manim import *
 
-class FixedScene(MovingCameraScene):
+class FixedScene(Scene):
     def construct(self):
-        # Kodnest-style dark background
-        self.camera.background_color = "#0F172A"
-        self.camera.frame.save_state()
-        
         self.wait(1.2)
         
         # Title (with wrapping for long titles)
@@ -5263,31 +5155,11 @@ class FixedScene(MovingCameraScene):
         # Generate AI animation that MATCHES the narration
         animation_code = generate_centered_animation(concept, narration, target_duration, client)
         
-        # Indent the code to fit inside construct()
-        # Manual indentation to be safe
-        indented_lines = []
-        for line in animation_code.split('\n'):
-            if line.strip():
-                indented_lines.append("        " + line)
-            else:
-                indented_lines.append("")
-        indented_code = '\n'.join(indented_lines)
-        
         code += f"""        # Animation Slide {idx + 1}: {concept}
-        # Wait for narration to start
-        self.wait(0.8)
-        
-{indented_code}
+{animation_code}
         self.wait(0.5)
-        
-        # Kodnest-style fade out with camera zoom
-        self.play(
-            FadeOut(Group(*self.mobjects), shift=UP*0.3),
-            self.camera.frame.animate.scale(1.1),
-            run_time=0.8
-        )
-        self.camera.frame.scale(1/1.1)
-        self.wait(0.2)
+        self.play(FadeOut(Group(*self.mobjects)), run_time=0.6)
+        self.wait(0.5)
         
 """
     
@@ -5306,76 +5178,55 @@ NARRATION (READ CAREFULLY):
 
 CRITICAL RULES:
 1. Extract KEY TERMS from the narration above
-2. Use those EXACT terms as labels
-3. DO NOT use generic labels like "1: Class", "2: Main"
+2. Use those EXACT terms as labels in your visualization
+3. DO NOT use generic labels like "1: Class", "2: Main", "Step 1", etc.
 4. USE ACTUAL WORDS from the narration!
 
-VISUALIZATION RULES:
-- **STACKS**: Use a VGroup of Rectangles arranged VERTICALLY (`.arrange(UP, buff=0)`).
-  - To push: Create box, move to top of stack, add to VGroup.
-  - To pop: Remove from VGroup, animate moving away/fading.
-  - **OVERFLOW**: If stack is full, show new item appearing ABOVE, trying to move down, hitting top, turning RED, and fading out. Label "Overflow".
-  - ALWAYS use `VGroup` to keep items together!
-  
-- **ARRAYS/LISTS**: Use a VGroup of Rectangles arranged HORIZONTALLY (`.arrange(RIGHT, buff=0)`).
+Example:
+- If narration mentions "System.out.println" → Use "System.out" as label
+- If narration mentions "HelloWorld" → Use "HelloWorld" as label
+- If narration mentions "public static void" → Use "public" or "static" as label
 
-- **LAYOUT**: 
-  - ALWAYS use `.next_to()` or `.arrange()` for positioning.
-  - NEVER use absolute coordinates like `[3, 4, 0]`.
-  - Keep everything centered with `.move_to(ORIGIN)`.
+BAD (generic):
+- "1: Class", "2: Main", "3: Print" ❌
 
-Example Stack Code:
-```python
-stack = VGroup()
-# Push 1
-box1 = Rectangle(height=1, width=2)
-label1 = Text("Data").move_to(box1)
-item1 = VGroup(box1, label1)
-if len(stack) > 0:
-    item1.next_to(stack[-1], UP, buff=0)
-else:
-    item1.move_to(DOWN * 2)
-stack.add(item1)
-self.play(Create(item1))
-```
+GOOD (from narration):
+- "HelloWorld", "System.out", "public" ✅
 
-Example Overflow Code:
-```python
-# Stack is full
-overflow_item = Rectangle(height=1, width=2, color=RED)
-overflow_label = Text("Overflow").move_to(overflow_item)
-grp = VGroup(overflow_item, overflow_label)
-grp.next_to(stack, UP, buff=0.5)
-self.play(FadeIn(grp))
-self.play(grp.animate.shift(DOWN * 0.2)) # Try to push
-self.play(grp.animate.shift(UP * 0.2), run_time=0.3) # Bounce back
-self.play(Indicate(grp, color=RED))
-self.play(FadeOut(grp))
-```
+OTHER RULES:
+- EVERY box MUST have a label
+- Font size: 20 (readable)
+- Max 10 chars per label
+- Use rectangles, not circles
 
 Duration: {target_duration:.1f}s
 
-Example code structure:
+Example code:
 ```python
-# ... setup code ...
-self.play(Animation1, run_time=1.0)
-self.play(Animation2, run_time=1.0)
-# ... more animations ...
-# Final wait will be adjusted automatically
-self.wait(1.0) 
+self.wait(1.0)
+
+# Extract terms from narration and create boxes
+box1 = Rectangle(width=2.5, height=1.5, color=BLUE)
+label1 = Text("Term1", font_size=20).move_to(box1)
+
+box2 = Rectangle(width=2.5, height=1.5, color=GREEN)
+    VGroup(box3, label3)
+)
+items.arrange(DOWN, buff=0.6)
+items.move_to(ORIGIN)
+
+self.play(FadeIn(items), run_time=1.5)
+self.wait({target_duration - 2.5:.1f})
 ```
 
 CRITICAL: EVERY box MUST have a label! NO empty boxes!
-CRITICAL: Return code with NO indentation (flush left).
-CRITICAL: DO NOT generate "class Scene" or "def construct". ONLY generate the animation commands (self.play, etc).
-CRITICAL: DO NOT start with self.wait(). Start animating IMMEDIATELY!
 
 Generate code:"""
     
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": "You are a Manim expert. Generate VIBRANT, COLORFUL animations. Use ACTUAL terms from narration. NO generic labels. NO class definitions. Return FLUSH LEFT code. START IMMEDIATELY."},
+            {"role": "system", "content": "Generate Manim code using ACTUAL terms from the narration as labels. NO generic labels like '1: Class' or 'Step 1'. Extract key words from narration and use them. EVERY box must have a label. Font size 20."},
             {"role": "user", "content": prompt}
         ],
         temperature=0.2
@@ -5383,156 +5234,11 @@ Generate code:"""
     
     ai_code = response.choices[0].message.content.strip()
     
-    # Remove initial wait if present
-    import re
-    ai_code = re.sub(r'^\s*self\.wait\([^)]+\)\s*\n', '', ai_code)
-    
     # Remove markdown
     if "```python" in ai_code:
         ai_code = ai_code.split("```python")[1].split("```")[0]
     elif "```" in ai_code:
         ai_code = ai_code.split("```")[1].split("```")[0]
-        
-    # Check if AI generated a class/def despite instructions
-    if "def construct(self):" in ai_code:
-        parts = ai_code.split("def construct(self):")
-        if len(parts) > 1:
-            ai_code = parts[1]
-            
-    # STEP 1: Strip ALL indentation from AI code AND remove comments
-        
-    # Fix indentation - Strip ALL indentation first, then use autopep8
-    import textwrap
-    import autopep8
-    
-    # STEP 1: Smart Dedent (preserve relative indentation)
-    lines = ai_code.split('\n')
-    # Remove empty leading lines
-    while lines and not lines[0].strip():
-        lines.pop(0)
-        
-    if lines:
-        # Find indent of first line
-        first_indent = len(lines[0]) - len(lines[0].lstrip())
-        # Dedent all lines by that amount
-        new_lines = []
-        for line in lines:
-            if len(line.strip()) == 0:
-                new_lines.append("")
-            else:
-                # Only strip if it has enough indent
-                current_indent = len(line) - len(line.lstrip())
-                if current_indent >= first_indent:
-                    new_lines.append(line[first_indent:])
-                else:
-                    new_lines.append(line.lstrip()) # Fallback
-        ai_code = '\n'.join(new_lines)
-        
-    # Remove comments
-    ai_code = '\n'.join(line for line in ai_code.split('\n') if not line.strip().startswith('#'))
-    
-    # STEP 2: Wrap in a function so autopep8 can parse it
-    wrapped = f"def dummy():\n{textwrap.indent(ai_code, '    ')}"
-    
-    # STEP 3: Fix with autopep8
-    fixed = autopep8.fix_code(wrapped)
-    print("DEBUG - autopep8 output:")
-    print(fixed[:500])
-    print("---")
-    
-    # STEP 4: Extract the function body and dedent
-    lines = fixed.split('\n')[1:]  # Skip first line
-    body = '\n'.join(lines)
-    ai_code = textwrap.dedent(body).strip()
-    
-    print("DEBUG - Final AI Code (should be flush left):")
-    print(ai_code[:200])
-    print("---")
-    
-    # --- SMART SYNC FIXER ---
-    # Calculate how much time the AI's animations take and adjust the wait
-    import re
-    
-    # Find all run_time=X.X
-    run_times = re.findall(r"run_time\s*=\s*(\d+\.?\d*)", ai_code)
-    total_anim_time = sum(float(t) for t in run_times)
-    
-    # Count default play calls (approx 1.0s each if no run_time specified)
-    # This is a heuristic: count .play( but subtract ones with run_time
-    total_plays = ai_code.count("self.play(")
-    explicit_runs = len(run_times)
-    default_runs = total_plays - explicit_runs
-    total_anim_time += default_runs * 1.0
-    
-    # FIX 1: Enforce Faster Animations (Sync Fix)
-    # Replace long run_times
-    ai_code = re.sub(r'run_time=(\d+\.?\d*)', lambda m: f'run_time={min(float(m.group(1)), 0.5)}', ai_code)
-    
-    # FIX 1.5: Convert Rectangle to RoundedRectangle for Kodnest style
-    def convert_to_rounded(match):
-        """Convert Rectangle(...) to RoundedRectangle(corner_radius=0.15, ...)"""
-        params = match.group(1)
-        if 'corner_radius' in params:
-            return match.group(0)
-        return f'RoundedRectangle(corner_radius=0.15, {params})'
-    
-    ai_code = re.sub(r'(?<!Rounded)Rectangle\(([^)]*)\)', convert_to_rounded, ai_code)
-
-
-    # FIX 3: Runtime Text Fitting (Prevent Overflow)
-    text_fitting_code = """
-    # AUTO-LAYOUT: Check for text overflow
-    # Iterate over all groups. If a group has a geometry and a text, check sizes.
-    for mob in self.mobjects:
-        if isinstance(mob, (Group, VGroup)) and len(mob) >= 2:
-            shape = None
-            text = None
-            for sub in mob:
-                if isinstance(sub, (Rectangle, Square, Circle)):
-                    shape = sub
-                elif isinstance(sub, Text):
-                    text = sub
-            
-            if shape and text:
-                # If text is wider than shape (with margin), move it DOWN
-                if text.width > shape.width * 0.9:
-                    text.next_to(shape, DOWN, buff=0.1)
-                    # Ensure it's visible
-                    if text.get_color() == shape.get_color():
-                        text.set_color(WHITE)
-    """
-    import textwrap
-    text_fitting_code = textwrap.dedent(text_fitting_code)
-    ai_code += f"\n{text_fitting_code}\n"
-
-    # FIX 2: Safety Scaling (Content Overflow Fix)
-    scaling_code = """
-    # SAFETY SCALING: Ensure nothing goes off-screen
-    all_mobs = Group(*self.mobjects)
-    if len(all_mobs) > 0:
-        # Aggressive scaling to fit in 12x6.5 box
-        if all_mobs.width > 12:
-            all_mobs.scale(12 / all_mobs.width)
-        if all_mobs.height > 6.5:
-            all_mobs.scale(6.5 / all_mobs.height)
-        
-        # Center if off-screen
-        if all_mobs.get_left()[0] < -6.5:
-            all_mobs.shift(RIGHT * ((-6.5) - all_mobs.get_left()[0]))
-        if all_mobs.get_right()[0] > 6.5:
-            all_mobs.shift(LEFT * (all_mobs.get_right()[0] - 6.5))
-        
-        # Ensure it's centered if it's the only thing
-        # all_mobs.move_to(ORIGIN) 
-    """
-    import textwrap
-    scaling_code = textwrap.dedent(scaling_code)
-    
-    # Calculate remaining wait needed
-    wait_time = max(0.1, target_duration - total_anim_time)
-    
-    # Append the wait call AND the scaling code
-    ai_code += f"\n{scaling_code}\nself.wait({wait_time:.2f})"
     
     # Remove imports/class/def
     cleaned = []
@@ -5546,45 +5252,6 @@ Generate code:"""
     # VALIDATION & FIXES
     import re
     
-    # STEP 1: Extract what the narration mentions
-    narration_lower = narration.lower()
-    mentioned_items = set()
-    
-    # Extract letters/numbers mentioned (like "box A", "element F", "node 5")
-    for match in re.finditer(r'\b([a-z])\b', narration_lower):
-        mentioned_items.add(match.group(1).upper())
-    for match in re.finditer(r'\b(\d+)\b', narration_lower):
-        mentioned_items.add(match.group(1))
-    
-    # Extract keywords (like "arrow", "front", "rear", "head", "tail")
-    keywords = ['arrow', 'front', 'rear', 'head', 'tail', 'top', 'bottom', 'left', 'right']
-    mentioned_keywords = set()
-    for keyword in keywords:
-        if keyword in narration_lower:
-            mentioned_keywords.add(keyword)
-    
-    print(f"   📝 Narration mentions: {mentioned_items}, Keywords: {mentioned_keywords}")
-    
-    # STEP 2: Check if mentioned items exist in code
-    code_lower = ai_code.lower()
-    missing_items = []
-    for item in mentioned_items:
-        # Check if this item appears as a variable or label
-        if not (f'"{item}"' in ai_code or f"'{item}'" in ai_code or f'_{item.lower()}' in code_lower or f'{item.lower()}_' in code_lower):
-            missing_items.append(item)
-    
-    if missing_items:
-        print(f"   ⚠️  WARNING: Narration mentions {missing_items} but they don't appear in code!")
-    
-    # STEP 3: Check if mentioned keywords exist
-    missing_keywords = []
-    for keyword in mentioned_keywords:
-        if keyword not in code_lower:
-            missing_keywords.append(keyword)
-    
-    if missing_keywords:
-        print(f"   ⚠️  WARNING: Narration mentions {missing_keywords} but they don't appear in code!")
-    
     # Fix colors
     for bad, good in [('BROWN', 'MAROON'), ('CYAN', 'TEAL'), ('MAGENTA', 'PINK')]:
         ai_code = ai_code.replace(f'color={bad}', f'color={good}')
@@ -5595,46 +5262,8 @@ Generate code:"""
     ai_code = re.sub(r'height=(\d+\.?\d*)', lambda m: f'height={min(float(m.group(1)), 1.5)}', ai_code)
     ai_code = re.sub(r'Circle\(radius=(\d+\.?\d*)', lambda m: f'Circle(radius={min(float(m.group(1)), 0.7)}', ai_code)
     
-    # Smart font_size: smaller for circles, normal for rectangles
-    # First, reduce font size for Text objects that are inside circles
-    lines = ai_code.split('\n')
-    new_lines = []
-    for i, line in enumerate(lines):
-        # If this line creates a Text and the previous few lines created a Circle, use smaller font
-        if '= Text(' in line:
-            # Look back to see if we're in a circle context
-            context = '\n'.join(lines[max(0, i-3):i])
-            if 'Circle(' in context:
-                # Use smaller font for circles
-                line = re.sub(r'font_size=\d+', 'font_size=16', line)
-                # If no font_size specified, add it
-                if 'font_size=' not in line:
-                    line = line.replace('Text(', 'Text(', 1)
-                    line = re.sub(r'Text\(([^)]+)\)', r'Text(\1, font_size=16)', line)
-            else:
-                # Use normal font for rectangles
-                line = re.sub(r'font_size=\d+', 'font_size=24', line) # Increased from 20 to 24
-        
-        new_lines.append(line)
-    ai_code = '\n'.join(new_lines)
-    
-    # CRITICAL: Ensure all Text objects are moved!
-    # If a Text object is created but never .move_to or .next_to, it will sit at ORIGIN
-    lines = ai_code.split('\n')
-    text_vars = {} # name -> line_idx
-    positioned_vars = set()
-    
-    for i, line in enumerate(lines):
-        if '= Text(' in line:
-            var_name = line.split('=')[0].strip()
-            text_vars[var_name] = i
-        
-        # Check for positioning methods
-        for var in text_vars:
-            if var in line and ('.move_to(' in line or '.next_to(' in line or '.to_edge(' in line or '.shift(' in line):
-                positioned_vars.add(var)
-    
-    ai_code = '\n'.join(lines)
+    # Force font_size to 20
+    ai_code = re.sub(r'font_size=\d+', 'font_size=20', ai_code)
     
     # CRITICAL VALIDATION: Check for empty Text objects
     # Replace Text("") or Text('') with Text("?")
@@ -5668,13 +5297,28 @@ Generate code:"""
     # Fix GrowArrow
     ai_code = re.sub(r'GrowArrow\(\*(\w+)\)', r'*[GrowArrow(a) for a in \1]', ai_code)
     
-    # (Nuclear Option removed - replaced by Global Safety Scaling at the end)
+    # NUCLEAR OPTION: Wrap EVERY self.play with safety scaling
+    lines = ai_code.split('\n')
+    new_lines = []
+    for line in lines:
+        if 'self.play(' in line and 'FadeOut' not in line:
+            indent = len(line) - len(line.lstrip())
+            new_lines.append(' ' * indent + '# Safety: scale all mobjects')
+            new_lines.append(' ' * indent + 'for mob in self.mobjects:')
+            new_lines.append(' ' * indent + '    if hasattr(mob, "scale") and mob.get_width() > 12:')
+            new_lines.append(' ' * indent + '        mob.scale(0.6)')
+            new_lines.append(' ' * indent + '    if hasattr(mob, "move_to"):')
+            new_lines.append(' ' * indent + '        mob.move_to(ORIGIN)')
+        new_lines.append(line)
     
-    ai_code = '\n'.join(lines)
+    ai_code = '\n'.join(new_lines)
     
     # Dedent
     import textwrap
     ai_code = textwrap.dedent(ai_code).strip()
     
-    return ai_code
+    # Indent for scene
+    indented_code = "\n".join("        " + line if line.strip() else "" for line in ai_code.split("\n"))
+    
+    return indented_code
 

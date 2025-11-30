@@ -5098,7 +5098,7 @@ Generate 3-4 slides."""
                 silence_wav = f"{output_name}_anim_{idx}_silence.wav"
                 subprocess.run([
                     "ffmpeg", "-y", "-f", "lavfi", "-i", "anullsrc=r=44100:cl=stereo",
-                    "-t", "2.5", "-c:a", "pcm_s16le", silence_wav
+                    "-t", "1.6", "-c:a", "pcm_s16le", silence_wav
                 ], check=True, capture_output=True)
                 
                 # Combine silence + narration (WAV + WAV = Clean WAV)
@@ -5116,7 +5116,7 @@ Generate 3-4 slides."""
                 if os.path.exists(silence_wav): os.remove(silence_wav)
                 if os.path.exists(narration_wav): os.remove(narration_wav)
                 
-                total_dur = 2.5 + narration_dur
+                total_dur = 1.6 + narration_dur
             
             # Cleanup raw TTS
             if os.path.exists(raw_tts_file): os.remove(raw_tts_file)
@@ -5176,7 +5176,7 @@ Generate 3-4 slides."""
         
         try:
             subprocess.run([
-                sys.executable, "-m", "manim", "-pqh", scene_file, "FixedScene"
+                sys.executable, "-m", "manim", "-pql", scene_file, "FixedScene"
             ], check=True, capture_output=True)
         except subprocess.CalledProcessError as e:
             print(f"❌ Manim Rendering Failed!")
@@ -5184,7 +5184,7 @@ Generate 3-4 slides."""
             print(f"STDERR:\n{e.stderr.decode()}")
             raise e
         
-        video_path = f"media/videos/{scene_file.replace('.py', '')}/1080p60/FixedScene.mp4"
+        video_path = f"media/videos/{scene_file.replace('.py', '')}/480p15/FixedScene.mp4"
         
         # Step 5: Combine
         print("🎵 Combining video + audio...")
@@ -5221,12 +5221,8 @@ def generate_fixed_slides_code(structure, durations, client):
     
     code = f"""from manim import *
 
-class FixedScene(MovingCameraScene):
+class FixedScene(Scene):
     def construct(self):
-        # Kodnest-style dark background
-        self.camera.background_color = "#0F172A"
-        self.camera.frame.save_state()
-        
         self.wait(1.2)
         
         # Title (with wrapping for long titles)
@@ -5274,20 +5270,10 @@ class FixedScene(MovingCameraScene):
         indented_code = '\n'.join(indented_lines)
         
         code += f"""        # Animation Slide {idx + 1}: {concept}
-        # Wait for narration to start
-        self.wait(0.8)
-        
 {indented_code}
         self.wait(0.5)
-        
-        # Kodnest-style fade out with camera zoom
-        self.play(
-            FadeOut(Group(*self.mobjects), shift=UP*0.3),
-            self.camera.frame.animate.scale(1.1),
-            run_time=0.8
-        )
-        self.camera.frame.scale(1/1.1)
-        self.wait(0.2)
+        self.play(FadeOut(Group(*self.mobjects)), run_time=0.6)
+        self.wait(0.5)
         
 """
     
@@ -5467,17 +5453,6 @@ Generate code:"""
     # FIX 1: Enforce Faster Animations (Sync Fix)
     # Replace long run_times
     ai_code = re.sub(r'run_time=(\d+\.?\d*)', lambda m: f'run_time={min(float(m.group(1)), 0.5)}', ai_code)
-    
-    # FIX 1.5: Convert Rectangle to RoundedRectangle for Kodnest style
-    def convert_to_rounded(match):
-        """Convert Rectangle(...) to RoundedRectangle(corner_radius=0.15, ...)"""
-        params = match.group(1)
-        if 'corner_radius' in params:
-            return match.group(0)
-        return f'RoundedRectangle(corner_radius=0.15, {params})'
-    
-    ai_code = re.sub(r'(?<!Rounded)Rectangle\(([^)]*)\)', convert_to_rounded, ai_code)
-
 
     # FIX 3: Runtime Text Fitting (Prevent Overflow)
     text_fitting_code = """
