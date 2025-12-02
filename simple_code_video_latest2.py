@@ -17,44 +17,44 @@ import textwrap
 # WHISPER TIMESTAMP FUNCTION
 # ============================================================
 
-# def transcribe_audio_with_timestamps(audio_file):
+def transcribe_audio_with_timestamps(audio_file):
 
-#     try:
-#         import whisper
+    try:
+        import whisper
         
-#         print("🎤 Transcribing audio with Whisper (word-level timestamps)...")
+        print("🎤 Transcribing audio with Whisper (word-level timestamps)...")
         
-#         # Load Whisper model (base model is fast and accurate)
-#         model = whisper.load_model("base")
+        # Load Whisper model (base model is fast and accurate)
+        model = whisper.load_model("base")
         
-#         # Transcribe with word timestamps
-#         result = model.transcribe(
-#             audio_file,
-#             word_timestamps=True,
-#             language="en"  
-#         )
+        # Transcribe with word timestamps
+        result = model.transcribe(
+            audio_file,
+            word_timestamps=True,
+            language="en"  
+        )
         
-#         # Extract word-level timestamps
-#         words = []
-#         for segment in result.get("segments", []):
-#             for word_info in segment.get("words", []):
-#                 words.append({
-#                     "word": word_info.get("word", "").strip(),
-#                     "start": word_info.get("start", 0),
-#                     "end": word_info.get("end", 0)
-#                 })
+        # Extract word-level timestamps
+        words = []
+        for segment in result.get("segments", []):
+            for word_info in segment.get("words", []):
+                words.append({
+                    "word": word_info.get("word", "").strip(),
+                    "start": word_info.get("start", 0),
+                    "end": word_info.get("end", 0)
+                })
         
-#         print(f"✅ Transcribed {len(words)} words with timestamps\n")
-#         return words
+        print(f"✅ Transcribed {len(words)} words with timestamps\n")
+        return words
         
-#     except ImportError:
-#         print("⚠️  Whisper not installed. Install: pip install openai-whisper")
-#         print("   Falling back to text-based timing estimation\n")
-#         return None
-#     except Exception as e:
-#         print(f"⚠️  Whisper transcription failed: {e}")
-#         print("   Falling back to text-based timing estimation\n")
-#         return None
+    except ImportError:
+        print("⚠️  Whisper not installed. Install: pip install openai-whisper")
+        print("   Falling back to text-based timing estimation\n")
+        return None
+    except Exception as e:
+        print(f"⚠️  Whisper transcription failed: {e}")
+        print("   Falling back to text-based timing estimation\n")
+        return None
 
 
 # ============================================================
@@ -62,6 +62,7 @@ import textwrap
 # ============================================================
 
 def get_audio_duration(audio_file):
+    """Get duration of audio file in seconds (works with any format)"""
     try:
         # Use ffprobe to get duration (works with any audio format)
         result = subprocess.run([
@@ -78,7 +79,26 @@ def get_audio_duration(audio_file):
         return None
 
 
+def get_video_duration(video_file):
+    """Get duration of video file in seconds using ffprobe"""
+    try:
+        result = subprocess.run([
+            'ffprobe', '-v', 'error',
+            '-show_entries', 'format=duration',
+            '-of', 'default=noprint_wrappers=1:nokey=1',
+            video_file
+        ], capture_output=True, text=True, check=True)
+        
+        duration = float(result.stdout.strip())
+        return duration
+    except Exception as e:
+        print(f"⚠️  Could not get video duration: {e}")
+        return None
 
+
+# ============================================================
+# HELPER: Generate SRT Subtitles from Audio
+# ============================================================
 
 def generate_srt_from_audio(audio_file, output_srt_file):
 
@@ -158,7 +178,9 @@ def generate_srt_from_audio(audio_file, output_srt_file):
         return False
 
 
-
+# ============================================================
+# HELPER: Generate Controlled Manim Code (No Random AI)
+# ============================================================
 
 def generate_slides_code(parsed_data, audio_duration=None, num_sections=None, section_durations=None):
     """
@@ -2637,7 +2659,217 @@ class CodeExplanationScene(Scene):
     return code
 
 
+def generate_code_display_code(code_content, audio_duration=None, narration_segments=None, key_concepts=None, key_concepts_start_time=None, overview_points=None, overview_duration=40.0):
+    """
+    Generate Manim code for scrolling code display - NO SLIDES, continuous scroll
+    Code starts below title and scrolls UP (code moves UP) to reveal content below
+    Adds final slide with key concepts if provided, synchronized with audio
+    Optionally shows overview slides at the beginning if overview_points provided
+    """
+    # Use original code (no cleaning - user won't pass comments)
+    lines = code_content.strip().split('\n')
+    
+    # Escape code for Python string
+    escaped_code = code_content.replace('\\', '\\\\').replace('"', '\\"')
+    
+    # Calculate timing for code scrolling
+    # Fixed overhead: 1.2s (initial wait) + 0.5s (title animation) + 1.0s (wait after title) + 0.5s (FadeIn code) = 3.2s
+    fixed_overhead = 1.2 + 0.5 + 1.0 + 0.5
+    
+    if audio_duration and key_concepts_start_time:
+        # Code scrolling should finish exactly when key concepts start
+        # Transition: FadeOut (0.5s) + small wait (0.2s) = 0.7s
+        transition_time = 0.7
+        # Code should finish at key_concepts_start_time, so:
+        code_scroll_time = key_concepts_start_time - fixed_overhead - transition_time
+        # Ensure minimum scroll time
+        code_scroll_time = max(code_scroll_time, 5.0)
+        
+        # Remaining time for key concepts slide (starts after transition)
+        concepts_slide_time = audio_duration - key_concepts_start_time
+        concepts_slide_time = max(concepts_slide_time, 3.0)  # Minimum 3 seconds
+    elif audio_duration:
+        # No key concepts - use all time for code
+        available_time = audio_duration - fixed_overhead - 1.0  # Final wait
+        code_scroll_time = max(available_time, 5.0)
+        concepts_slide_time = 0
+    else:
+        # Fallback timing
+        code_scroll_time = len(lines) * 0.5
+        concepts_slide_time = 0
+    
+    # Build concepts slide code
+    if key_concepts and concepts_slide_time > 0:
+        # Escape concepts for Python string
+        concepts_list = "[" + ", ".join(['"' + c.replace('"', '\\"') + '"' for c in key_concepts]) + "]"
+        # Animation overhead: title (0.5s), wait (0.3s), items (1.0s) = 1.8s
+        concepts_display_time = concepts_slide_time - 1.8
+        concepts_display_time = max(concepts_display_time, 2.0)  # Minimum 2 seconds
+        
+        concepts_slide_code = f"""
+        # Key Concepts slide (synchronized with audio)
+        concepts_title = Text(
+            "Key Concepts",
+            font_size=38,
+            font="Helvetica",
+            weight=BOLD,
+            color=BLUE
+        )
+        concepts_title.to_edge(UP, buff=0.4)
+        
+        # Create bullet points for concepts
+        concept_items = VGroup(*[
+            Text(
+                f"• {{concept}}",
+                font_size=24,
+                font="Helvetica",
+                color=WHITE
+            )
+            for concept in {concepts_list}
+        ])
+        concept_items.arrange(DOWN, aligned_edge=LEFT, buff=0.4)
+        concept_items.next_to(concepts_title, DOWN, buff=0.6)
+        concept_items.to_edge(LEFT, buff=0.8)
+        
+        # Show concepts (synchronized with audio)
+        self.play(Write(concepts_title), run_time=0.5)
+        self.wait(0.3)
+        self.play(Write(concept_items), run_time=1.0)
+        self.wait({concepts_display_time})  # Display for remaining audio time
+"""
+    else:
+        concepts_slide_code = """
+        # No concepts - just wait
+        self.wait(1)
+"""
+    
+    # Generate overview slides code if overview_points provided
+    if overview_points and len(overview_points) > 0:
+        # Calculate timing for overview slides
+        time_per_slide = overview_duration / max(len(overview_points), 1)
+        
+        overview_slides_code = f"""        # Overview Slides ({overview_duration:.1f}s total)
+        # Show {len(overview_points)} overview points about the code
+        
+        # Overview title
+        overview_title = Text(
+            "Code Overview",
+            font_size=42,
+            font="Helvetica",
+            weight=BOLD,
+            color=BLUE
+        )
+        overview_title.to_edge(UP, buff=0.5)
+        self.play(Write(overview_title), run_time=0.5)
+        self.wait(0.5)
+        
+"""
+        
+        # Add each overview point as a slide
+        for idx, point in enumerate(overview_points):
+            # Escape the point text for Python string
+            escaped_point = point.replace('\\', '\\\\').replace('"', '\\"')
+            
+            overview_slides_code += f"""        # Overview Point {idx + 1}
+        point_{idx} = Text(
+            "• {escaped_point}",
+            font_size=28,
+            font="Helvetica",
+            color=WHITE
+        )
+        point_{idx}.next_to(overview_title, DOWN, buff=1.0)
+        point_{idx}.to_edge(LEFT, buff=1.0)
+        self.play(FadeIn(point_{idx}), run_time=0.4)
+        self.wait({time_per_slide - 0.8:.2f})
+        self.play(FadeOut(point_{idx}), run_time=0.4)
+        
+"""
+        
+        overview_slides_code += f"""        # Fade out overview title
+        self.play(FadeOut(overview_title), run_time=0.5)
+        self.wait(0.5)
+        
+"""
+    else:
+        # No overview points - just wait
+        overview_slides_code = f"""        # No overview slides - waiting {overview_duration:.1f}s
+        self.wait({overview_duration:.1f})
+        
+"""
+    
+    # Create full code text
+    code = f"""from manim import *
 
+class CodeExplanationScene(Scene):
+    def construct(self):
+        # Beautiful dark background (matches animated video)
+        self.camera.background_color = "#0F172A"
+        
+{overview_slides_code}        
+        title = Text(
+            "Code Explanation",
+            font_size=48,
+            font="Helvetica",
+            weight=BOLD,
+            gradient=(BLUE, PURPLE)
+        )
+        title.to_edge(UP, buff=0.5)
+        self.play(FadeIn(title, shift=DOWN*0.3), run_time=0.8)
+        self.wait(0.3)  # Small wait after title
+        
+        # Create full code text (larger font, no gaps)
+        full_code = Text(
+            \"\"\"{escaped_code}\"\"\",
+            font_size=22,
+            font="Courier",
+            color=WHITE,
+            line_spacing=1.0
+        )
+        
+        # Ensure code fits on screen width
+        if full_code.width > 13:
+            full_code.scale_to_fit_width(13)
+        
+        # Position code below title - CRITICAL: start with TOP of code just below title
+        full_code.to_edge(LEFT, buff=0.5)
+        
+        # Available screen height: from below title (Y~2.5) to bottom (Y~-3.5) = ~5.5 units
+        available_screen_height = 5.5
+        code_height = full_code.height
+        
+        if code_height > available_screen_height:
+            # Code needs scrolling - start with TOP of code at Y=2.5 (just below title)
+            code_center_x = full_code.get_left()[0] + full_code.width/2
+            
+            # START position: Top of code at Y=2.5 (just below title)
+            # Center Y = top Y - (code_height / 2)
+            start_center_y = 2.5 - (code_height / 2)
+            full_code.move_to([code_center_x, start_center_y, 0])
+            
+            # END position: Bottom of code at Y=-3.5 (screen bottom)
+            # Center Y = bottom Y + (code_height / 2)
+            end_center_y = -3.5 + (code_height / 2)
+            scroll_distance = end_center_y - start_center_y
+            
+            # Show code - NO continuous scroll, we'll scroll incrementally per highlight
+            self.play(FadeIn(full_code), run_time=0.5)
+        else:
+            # Code fits on screen - position it below title
+            full_code.next_to(title, DOWN, buff=0.3)
+            self.play(FadeIn(full_code), run_time=0.5)
+            # No scrolling needed - just wait for highlights
+            scroll_distance = 0
+        
+        # Fade out code (transition to key concepts - synchronized with audio)
+        self.play(FadeOut(full_code), FadeOut(title), run_time=0.5)
+        self.wait(0.2)  # Quick transition
+        
+        # Final slide: Key Concepts (if provided) - appears exactly when audio explains them
+{concepts_slide_code}
+```
+"""
+    
+    return code
 
 
 def code_to_video(code_content: str, output_name: str = "output", audio_language: str = "english", add_subtitles: bool = False):
@@ -4156,7 +4388,531 @@ Make it natural and concise. Start with "Key concepts include..." or similar."""
         return None
 
 
+# ============================================================
+# EXAMPLES
+# ============================================================
 
+if __name__ == "__main__":
+    
+    
+    # Example 1: TEXT TO VIDEO
+    # Use for: Documentation, tutorials, explanations
+    
+    text_content = """
+    Bubble Sort Algorithm
+    
+    Bubble Sort is one of the simplest sorting algorithms. It works by repeatedly 
+    comparing adjacent elements and swapping them if they're in the wrong order.
+    
+    How It Works
+    The algorithm makes multiple passes through the array. In each pass, it compares 
+    consecutive pairs of elements. When a larger element comes before a smaller one, 
+    they are swapped.
+    
+    Time Complexity
+    
+    The algorithm has O(n²) time complexity in worst and average cases, making it 
+    inefficient for large datasets. However, its simplicity makes it excellent for 
+    educational purposes.
+    
+    Practical Use
+    
+    While not used in production due to inefficiency, Bubble Sort is valuable for 
+    teaching fundamental sorting concepts.
+    """
+    
+    # result = text_to_video(text_content, "bubble_sort_explanation")
+    
+    
+    # Example 3: CODE TO VIDEO
+    # Use for: Code explanations
+    
+    pyramid_code = """
+rows = 5
+for i in range(1, rows + 1):
+    for j in range(1, i + 1):
+        print(j, end=" ")
+    print()
+"""
+    
+    result = code_to_video(
+        code_content=pyramid_code,
+        output_name="pyramid_code_explanation"
+    )
+    
+    
+    # More examples - just change the input!
+    
+    # TEXT TO VIDEO examples:
+    # text_to_video("Neural networks explained...", "neural_networks")
+    # text_to_video("Machine learning basics...", "ml_basics")
+    
+    # ANIMATION TO VIDEO examples:
+    # animation_to_video("Quick Sort algorithm", "quick_sort")
+    # animation_to_video("Binary Search Tree operations", "bst")
+    # animation_to_video("Graph BFS traversal", "graph_bfs")
+    # animation_to_video("Pythagorean theorem proof", "pythagoras")
+    
+    
+    if not result:
+        sys.exit(1)
+    
+
+# ============================================================
+# QUERY TO ANIMATED VIDEO - Simple Text Slides
+# ============================================================
+
+def query_to_animated_video(query: str, output_name: str = "output", audio_language: str = "english"):
+    """Convert query to beautiful animated text slides - works with ANY query"""
+    try:
+        print(f"\n{'='*60}")
+        print(f"🎨 QUERY TO ANIMATED VIDEO: {output_name}")
+        print(f"{'='*60}\n")
+        
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            print("❌ Set OPENAI_API_KEY environment variable")
+            return None
+        
+        client = openai.OpenAI(api_key=api_key)
+        
+        # Generate simple content (1-2 slides)
+        print(f"🤖 Generating content for: '{query}'...")
+        
+        content_prompt = f"""Generate educational content about: {query}
+
+Create 1-2 simple slides. Return JSON:
+{{
+    "title": "Main Topic",
+    "slides": [
+        {{
+            "heading": "Definition",
+            "content": "2-3 sentences...",
+            "narration": "Spoken text..."
+        }}
+    ]
+}}"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Create clear educational content."},
+                {"role": "user", "content": content_prompt}
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
+        )
+        
+        content_data = json.loads(response.choices[0].message.content)
+        print(f"✅ Generated {len(content_data.get('slides', []))} slides\n")
+        
+        # Generate audio per slide
+        print("🎙️ Generating audio...")
+        section_audio_files = []
+        section_durations = []
+        
+        # Title
+        title_audio = f"{output_name}_title.aiff"
+        generate_audio_for_language(f"{content_data.get('title', '')}.", audio_language, title_audio, client)
+        title_duration = get_audio_duration(title_audio)
+        section_audio_files.append(title_audio)
+        print(f"   Title: {title_duration:.2f}s")
+        
+        # Slides
+        for idx, slide in enumerate(content_data.get('slides', [])):
+            slide_audio = f"{output_name}_slide_{idx}.aiff"
+            generate_audio_for_language(slide.get('narration', ''), audio_language, slide_audio, client)
+            slide_duration = get_audio_duration(slide_audio)
+            section_durations.append(slide_duration)
+            section_audio_files.append(slide_audio)
+            print(f"   Slide {idx + 1}: {slide_duration:.2f}s")
+        
+        # Combine audio
+        print("\n🎵 Combining audio...")
+        audio_file = f"{output_name}_audio.mp3"
+        concat_file = f"{output_name}_concat.txt"
+        
+        with open(concat_file, 'w') as f:
+            for audio in section_audio_files:
+                f.write(f"file '{audio}'\n")
+        
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", concat_file, "-c:a", "libmp3lame", "-b:a", "192k", audio_file
+        ], check=True, capture_output=True)
+        
+        # Cleanup
+        for audio in section_audio_files:
+            if os.path.exists(audio): os.remove(audio)
+        if os.path.exists(concat_file): os.remove(concat_file)
+        
+        audio_duration = get_audio_duration(audio_file) or (title_duration + sum(section_durations))
+        print(f"✅ Audio: {audio_duration:.2f}s\n")
+        
+        # Generate Manim code
+        print("🎨 Generating Manim code...")
+        manim_code = f"""from manim import *
+
+class SimpleTextScene(Scene):
+    def construct(self):
+        self.wait(1.2)
+        
+        # Title
+        title = Text("{content_data.get('title', '')}", font_size=48, font="JetBrains Mono", weight=BOLD, color=GOLD)
+        title.to_edge(UP, buff=0.5)
+        self.play(FadeIn(title, shift=DOWN*0.3), run_time=0.8)
+        self.wait(1.5)
+        self.play(FadeOut(title), run_time=0.5)
+        
+"""
+        
+        for idx, slide in enumerate(content_data.get('slides', [])):
+            content = slide.get('content', '').replace('"', '\\"')
+            wait_time = max(section_durations[idx] - 2.5, 2.0) if idx < len(section_durations) else 3.0
+            
+            manim_code += f"""        # Slide {idx + 1}
+        text_{idx} = Text("{content}", font_size=28, font="JetBrains Mono", color=WHITE, line_spacing=1.5)
+        text_{idx}.scale_to_fit_width(11)
+        text_{idx}.move_to(ORIGIN)
+        self.play(FadeIn(text_{idx}, shift=UP*0.2), run_time=1.0)
+        self.wait({wait_time})
+        self.play(FadeOut(text_{idx}), run_time=0.6)
+        self.wait(0.5)
+        
+"""
+        
+        manim_code += "        self.wait(1)\n"
+        
+        # Render
+        print("🎬 Rendering...")
+        scene_file = f".temp_{output_name}.py"
+        with open(scene_file, 'w') as f:
+            f.write(manim_code)
+        
+        subprocess.run([
+            "venv/bin/python", "-m", "manim", "-pql", scene_file, "SimpleTextScene"
+        ], check=True, capture_output=True)
+        
+        video_path = f"media/videos/{scene_file.replace('.py', '')}/480p15/SimpleTextScene.mp4"
+        
+        # Combine
+        print("🎵 Combining video + audio...")
+        final_output = f"{output_name}_final.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-i", video_path, "-i", audio_file,
+            "-c:v", "copy", "-c:a", "aac", "-shortest", final_output
+        ], check=True, capture_output=True)
+        
+        print(f"\n{'='*60}")
+        print(f"✅ SUCCESS! {final_output}")
+        print(f"{'='*60}\n")
+        
+        return {"final_video": final_output}
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+"""
+Correct implementation: Text slides THEN animated visuals
+"""
+
+def query_to_animated_video_v2(query: str, output_name: str = "output", audio_language: str = "english"):
+    """
+    Creates video with:
+    1. Slide 1-2: Text definition/explanation
+    2. Slide 3+: AI-generated animated visuals (like code overview)
+    """
+    try:
+        print(f"\n{'='*60}")
+        print(f"🎨 QUERY TO ANIMATED VIDEO (Text + Animations)")
+        print(f"{'='*60}\n")
+        
+        import os, json, subprocess
+        import openai
+        
+        api_key = os.getenv("OPENAI_API_KEY")
+        client = openai.OpenAI(api_key=api_key)
+        
+        # Step 1: Generate structure - text slides + animation concepts
+        print(f"🤖 Generating content for: '{query}'...")
+        
+        structure_prompt = f"""Create educational video structure for: {query}
+
+Generate:
+1. Title
+2. 1-2 TEXT slides (definition, explanation)
+3. 2-3 ANIMATION concepts (visual representations)
+
+Return JSON:
+{{
+    "title": "Topic Title",
+    "text_slides": [
+        {{
+            "heading": "Definition",
+            "content": "Clear 2-3 sentence explanation",
+            "narration": "What to say"
+        }}
+    ],
+    "animation_slides": [
+        {{
+            "concept": "Visual concept to animate (e.g., 'AI capabilities with 3 circles')",
+            "narration": "What to explain during animation"
+        }}
+    ]
+}}
+
+Keep text slides simple. Animation concepts should be visual (diagrams, flows, icons)."""
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": "Create clear educational content with text and visual concepts."},
+                {"role": "user", "content": structure_prompt}
+            ],
+            temperature=0.7,
+            response_format={"type": "json_object"}
+        )
+        
+        structure = json.loads(response.choices[0].message.content)
+        print(f"✅ Generated structure:")
+        print(f"   - {len(structure.get('text_slides', []))} text slides")
+        print(f"   - {len(structure.get('animation_slides', []))} animation slides\n")
+        
+        # Step 2: Generate audio for all slides
+        print("🎙️ Generating audio...")
+        
+        from simple_app import generate_audio_for_language, get_audio_duration
+        
+        audio_files = []
+        durations = []
+        
+        # Title
+        title_audio = f"{output_name}_title.aiff"
+        generate_audio_for_language(f"{structure.get('title', '')}.", audio_language, title_audio, client)
+        title_dur = get_audio_duration(title_audio)
+        audio_files.append(title_audio)
+        print(f"   Title: {title_dur:.2f}s")
+        
+        # Text slides
+        for idx, slide in enumerate(structure.get('text_slides', [])):
+            audio_file = f"{output_name}_text_{idx}.aiff"
+            generate_audio_for_language(slide.get('narration', ''), audio_language, audio_file, client)
+            dur = get_audio_duration(audio_file)
+            durations.append(('text', dur))
+            audio_files.append(audio_file)
+            print(f"   Text slide {idx + 1}: {dur:.2f}s")
+        
+        # Animation slides
+        for idx, slide in enumerate(structure.get('animation_slides', [])):
+            audio_file = f"{output_name}_anim_{idx}.aiff"
+            generate_audio_for_language(slide.get('narration', ''), audio_language, audio_file, client)
+            dur = get_audio_duration(audio_file)
+            durations.append(('animation', dur))
+            audio_files.append(audio_file)
+            print(f"   Animation slide {idx + 1}: {dur:.2f}s")
+        
+        # Combine audio
+        print("\n🎵 Combining audio...")
+        audio_file = f"{output_name}_audio.mp3"
+        concat_file = f"{output_name}_concat.txt"
+        
+        with open(concat_file, 'w') as f:
+            for audio in audio_files:
+                f.write(f"file '{audio}'\n")
+        
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0",
+            "-i", concat_file, "-c:a", "libmp3lame", "-b:a", "192k", audio_file
+        ], check=True, capture_output=True)
+        
+        # Cleanup
+        for audio in audio_files:
+            if os.path.exists(audio): os.remove(audio)
+        if os.path.exists(concat_file): os.remove(concat_file)
+        
+        total_duration = get_audio_duration(audio_file)
+        print(f"✅ Total audio: {total_duration:.2f}s\n")
+        
+        # Step 3: Generate Manim code
+        print("🎨 Generating Manim code (text + AI animations)...")
+        
+        manim_code = generate_mixed_slides_code(structure, durations, client)
+        
+        # Step 4: Render
+        print("🎬 Rendering...")
+        scene_file = f".temp_{output_name}.py"
+        with open(scene_file, 'w') as f:
+            f.write(manim_code)
+        
+        subprocess.run([
+            "venv/bin/python", "-m", "manim", "-pql", scene_file, "MixedScene"
+        ], check=True, capture_output=True)
+        
+        video_path = f"media/videos/{scene_file.replace('.py', '')}/480p15/MixedScene.mp4"
+        
+        # Step 5: Combine
+        print("🎵 Combining video + audio...")
+        final_output = f"{output_name}_final.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-i", video_path, "-i", audio_file,
+            "-c:v", "copy", "-c:a", "aac", "-shortest", final_output
+        ], check=True, capture_output=True)
+        
+        print(f"\n{'='*60}")
+        print(f"✅ SUCCESS! {final_output}")
+        print(f"{'='*60}\n")
+        
+        return {"final_video": final_output}
+        
+    except Exception as e:
+        print(f"❌ Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+def generate_mixed_slides_code(structure, durations, client):
+    """Generate Manim code with text slides THEN AI-generated animations"""
+    
+    title = structure.get("title", "")
+    text_slides = structure.get("text_slides", [])
+    animation_slides = structure.get("animation_slides", [])
+    
+    code = f"""from manim import *
+
+class MixedScene(Scene):
+    def construct(self):
+        self.wait(1.2)
+        
+        # Title
+        title = Text("{title}", font_size=48, font="JetBrains Mono", weight=BOLD, color=GOLD)
+        title.to_edge(UP, buff=0.5)
+        self.play(FadeIn(title, shift=DOWN*0.3), run_time=0.8)
+        self.wait(1.5)
+        self.play(FadeOut(title), run_time=0.5)
+        
+"""
+    
+    dur_idx = 0
+    
+    # TEXT SLIDES
+    for idx, slide in enumerate(text_slides):
+        content = slide.get('content', '').replace('"', '\\"').replace('\n', ' ')
+        wait_time = max(durations[dur_idx][1] - 2.5, 2.0) if dur_idx < len(durations) else 3.0
+        dur_idx += 1
+        
+        code += f"""        # Text Slide {idx + 1}
+        text_{idx} = Text(
+            "{content}",
+            font_size=26,
+            font="JetBrains Mono",
+            color=WHITE,
+            line_spacing=1.5
+        )
+        text_{idx}.scale_to_fit_width(11)
+        text_{idx}.move_to(ORIGIN)
+        self.play(FadeIn(text_{idx}, shift=UP*0.2), run_time=1.0)
+        self.wait({wait_time})
+        self.play(FadeOut(text_{idx}), run_time=0.6)
+        self.wait(0.5)
+        
+"""
+    
+    # ANIMATION SLIDES (AI-generated)
+    for idx, slide in enumerate(animation_slides):
+        concept = slide.get('concept', '')
+        target_duration = durations[dur_idx][1] if dur_idx < len(durations) else 10.0
+        dur_idx += 1
+        
+        # Generate AI animation code (like overview)
+        animation_code = generate_ai_animation_for_concept(concept, target_duration, client)
+        
+        code += f"""        # Animation Slide {idx + 1}: {concept}
+{animation_code}
+        self.wait(0.5)
+        self.play(FadeOut(Group(*self.mobjects)), run_time=0.6)
+        self.wait(0.5)
+        
+"""
+    
+    code += "        self.wait(1)\n"
+    
+    return code
+
+
+def generate_ai_animation_for_concept(concept, narration, target_duration, client):
+    """Generate Manim animation code using AI (like code overview)"""
+    
+    prompt = f"""
+    You are a Manim Animation Expert. Generate Python code using ManimCE to visualize the following concept.
+    
+    CONCEPT: {concept}
+    NARRATION: "{narration}"
+    DURATION: {target_duration} seconds
+    
+    CRITICAL RULES:
+    1. **MATCH NARRATION EXACTLY**: 
+       - If narration says "top to bottom", use `.arrange(DOWN)`.
+       - If narration says "left to right", use `.arrange(RIGHT)`.
+       - If narration lists items "1, 2, 3", show them in that EXACT order.
+       - Do NOT reverse the order unless explicitly told to.
+    
+    2. **NO TEXT OVERFLOW**:
+       - If text is long, do NOT put it inside a small box. Place it BELOW or NEXT TO the box.
+       - If a label is wider than its container, move it OUTSIDE.
+       - Use `font_size=32` or larger for important labels.
+    
+    3. **VISUAL CLARITY**:
+       - Use VIBRANT colors (BLUE, GREEN, YELLOW, RED).
+       - NEVER use default white lines.
+       - Make arrows THICK (`stroke_width=6`).
+       - Make text BIG and BOLD.
+    
+    4. **CODE STRUCTURE**:
+       - Return ONLY the Python code inside a `def construct(self):` method.
+       - Do NOT include `class` or `import` statements (I will add them).
+       - Do NOT use `self.wait()` at the start. Start animating IMMEDIATELY.
+    
+    Example of Good Logic:
+    ```python
+    # If narration says "Stack grows from bottom to top"
+    stack = VGroup()
+    for i in range(3):
+        item = VGroup(Rectangle(...), Text(...))
+        # New items go ON TOP
+        if len(stack) > 0:
+            item.next_to(stack[-1], UP, buff=0)
+        stack.add(item)
+    ```
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": "You are a Manim animation expert."},
+            {"role": "user", "content": prompt}
+        ],
+        temperature=0.5
+    )
+    
+    ai_code = response.choices[0].message.content.strip()
+    
+    # Remove markdown code blocks if present
+    if "```python" in ai_code:
+        ai_code = ai_code.split("```python")[1].split("```")[0]
+    elif "```" in ai_code:
+        ai_code = ai_code.split("```")[1].split("```")[0]
+    
+    # Indent the code (8 spaces for being inside construct method)
+    indented_code = "\n".join("        " + line if line.strip() else "" for line in ai_code.split("\n"))
+    
+    return indented_code
+
+"""
+FIXED: Text slides with proper wrapping + Centered animations
+"""
 
 def query_to_animated_video_v3(query: str, output_name: str = "output", audio_language: str = "english"):
     """
