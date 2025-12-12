@@ -3916,24 +3916,24 @@ Return JSON:
     "title": "Topic Title (max 40 chars)",
     "animation_slides": [
         {{
-            "concept": "SLIDE 1 - QUALITY INTRODUCTION: Show 3-4 well-designed elements with clear labels and proper spacing. Use shapes, colors, and positioning to make it visually appealing. NOT just boring circles! If comparing, show BOTH sides with equal detail.",
+            "concept": "ULTRA-SPECIFIC: Show BASIC BUILDING BLOCKS - individual elements with clear labels. If comparing, show elements of BOTH sides.",
             "complexity": "simple",
-            "narration": "4-5 sentences: Introduce each element by name/number, explain what each represents, describe their individual properties and visual characteristics"
+            "narration": "4-5 sentences: Introduce each element by name/number, explain what each represents, describe their individual properties"
         }},
         {{
-            "concept": "SLIDE 2 - QUALITY CONNECTIONS: Show 4-6 elements with 2-3 meaningful connections (arrows, lines). Use different colors for different types of connections. Arrange elements to show clear flow. If comparing, show connections on BOTH sides.",
+            "concept": "ULTRA-SPECIFIC: Show SIMPLE RELATIONSHIPS - how 2-3 elements connect. If comparing, show connections on BOTH sides.",
             "complexity": "intermediate",
-            "narration": "4-5 sentences: Explain HOW elements connect, WHY they connect this way, what flows between them, describe the relationship and any transformations"
+            "narration": "4-5 sentences: Explain HOW elements connect, WHY they connect this way, what flows between them, describe the relationship"
         }},
         {{
-            "concept": "SLIDE 3 - ADVANCED INTERACTIONS: Show 6-10 elements with bidirectional connections, feedback loops, or cycles. Use curved arrows, color transitions, or animations to show dynamic flow. If comparing, show complex interactions on BOTH sides.",
+            "concept": "ULTRA-SPECIFIC: Show COMPLEX INTERACTIONS - multiple elements with bidirectional connections. If comparing, show interactions on BOTH sides.",
             "complexity": "advanced",
-            "narration": "4-5 sentences: Describe the complete flow, explain each transformation step, mention all connection points, explain feedback mechanisms and the overall process"
+            "narration": "4-5 sentences: Describe the complete flow, explain each transformation step, mention all connection points, explain the overall process"
         }},
         {{
-            "concept": "SLIDE 4 - SPECTACULAR FINALE: Show the COMPLETE SYSTEM with 10+ elements, multiple layers, advanced animations (transforms, pulses, highlights). Use loops to generate patterns. Show the entire cycle working together. If comparing, show FINAL STATE of both sides with all interactions visible.",
+            "concept": "COMPLEX ANIMATION: COMPLETE SYSTEM - all elements working together. If comparing, show the FINAL STATE of both sides side-by-side.",
             "complexity": "complex",
-            "narration": "5-6 sentences: Describe the entire system in action, explain how all parts work together, mention all feedback mechanisms, describe the complete cycle from start to finish, emphasize the overall harmony"
+            "narration": "5-6 sentences: Describe the entire system, explain how all parts work together, mention feedback mechanisms, describe the complete cycle from start to finish"
         }}
     ]
 }}
@@ -4208,7 +4208,6 @@ class FixedScene(MovingCameraScene):
     for idx, slide in enumerate(animation_slides):
         concept = slide.get('concept', '')
         narration = slide.get('narration', '')  # GET THE NARRATION!
-        complexity = slide.get('complexity', 'simple')  # GET THE COMPLEXITY LEVEL!
         total_duration = durations[dur_idx][1] if dur_idx < len(durations) else 10.0
         dur_idx += 1
         
@@ -4217,9 +4216,9 @@ class FixedScene(MovingCameraScene):
         video_overhead = 1.1
         target_duration = max(total_duration - video_overhead, 3.0)  # Minimum 3s
         
-        # Generate AI animation that MATCHES the narration AND complexity level
+        # Generate AI animation that MATCHES the narration
         # CRITICAL: skip_global_sync=True preserves per-slide timing
-        animation_code = generate_centered_animation(concept, narration, target_duration, client, skip_global_sync=True, complexity=complexity)
+        animation_code = generate_centered_animation(concept, narration, target_duration, client, skip_global_sync=True)
 
         
         # Indent the code to fit inside construct()
@@ -4418,56 +4417,13 @@ def generate_with_ai_critic_loop(client, prompt, requirements, concept="", narra
     return None, False
 
 
-def generate_centered_animation(concept, narration, target_duration, client, skip_global_sync=False, complexity="simple"):
-    """Generate animation that MATCHES narration exactly AND follows complexity level"""
-    
-    # COMPLEXITY-SPECIFIC RULES
-    complexity_rules = {
-        "simple": """
-🎯 COMPLEXITY LEVEL: SIMPLE (Slide 1)
-- Use 2-4 basic shapes (Circle, Square, Rectangle)
-- Simple positioning (no complex arrangements)
-- Basic animations (Create, FadeIn, Write)
-- Clear, large labels
-- Example: Show individual elements with names
-""",
-        "intermediate": """
-🎯 COMPLEXITY LEVEL: INTERMEDIATE (Slide 2)
-- Use 4-6 objects with simple connections
-- Add 1-2 arrows showing relationships
-- Use Transform or MoveToTarget
-- Group related elements with VGroup
-- Example: Show how 2-3 elements connect
-""",
-        "advanced": """
-🎯 COMPLEXITY LEVEL: ADVANCED (Slide 3)
-- Use 6-10 objects with multiple connections
-- Add bidirectional arrows or curved paths
-- Use ReplacementTransform, Indicate, Circumscribe
-- Create visual flow or cycle
-- Example: Show complex interactions between elements
-""",
-        "complex": """
-🎯 COMPLEXITY LEVEL: COMPLEX (Slide 4 - FINAL SLIDE)
-⚠️ THIS IS THE LAST SLIDE - MAKE IT SPECTACULAR!
-- Use 10+ objects in sophisticated arrangement
-- Multiple animation layers (transforms + effects)
-- Advanced techniques: TracedPath, ShowPassingFlash, FadeToColor
-- Create complete system visualization
-- Use loops to generate patterns
-- Combine multiple animation types
-- Example: Show entire system working together with all feedback loops
-"""
-    }
-    
-    complexity_instruction = complexity_rules.get(complexity, complexity_rules["simple"])
+def generate_centered_animation(concept, narration, target_duration, client, skip_global_sync=False):
+    """Generate animation that MATCHES narration exactly"""
     
     prompt = f"""Create Manim visualization for: {concept}
 
 NARRATION (READ CAREFULLY):
 "{narration}"
-
-{complexity_instruction}
 
 🎨 BE CREATIVE & ADVANCED - NOT SIMPLE!
 - Use transformations, paths, curves, and motion

@@ -3892,7 +3892,6 @@ CRITICAL RULES:
 3. Concepts must be ULTRA-SPECIFIC with exact details!
 4. Narration must explain EVERY element shown (no skipping connections/relationships!)
 5. COMPARISONS: If comparing A vs B, show BOTH sides with equivalent complexity (don't leave one side empty!)
-6. Never Create animation that goes out of screen
 
 BAD (vague):
 - "Visualize an array"
@@ -3916,24 +3915,24 @@ Return JSON:
     "title": "Topic Title (max 40 chars)",
     "animation_slides": [
         {{
-            "concept": "SLIDE 1 - QUALITY INTRODUCTION: Show 3-4 well-designed elements with clear labels and proper spacing. Use shapes, colors, and positioning to make it visually appealing. NOT just boring circles! If comparing, show BOTH sides with equal detail.",
+            "concept": "ULTRA-SPECIFIC: Show BASIC BUILDING BLOCKS - individual elements with clear labels. If comparing, show elements of BOTH sides.",
             "complexity": "simple",
-            "narration": "4-5 sentences: Introduce each element by name/number, explain what each represents, describe their individual properties and visual characteristics"
+            "narration": "4-5 sentences: Introduce each element by name/number, explain what each represents, describe their individual properties"
         }},
         {{
-            "concept": "SLIDE 2 - QUALITY CONNECTIONS: Show 4-6 elements with 2-3 meaningful connections (arrows, lines). Use different colors for different types of connections. Arrange elements to show clear flow. If comparing, show connections on BOTH sides.",
+            "concept": "ULTRA-SPECIFIC: Show SIMPLE RELATIONSHIPS - how 2-3 elements connect. If comparing, show connections on BOTH sides.",
             "complexity": "intermediate",
-            "narration": "4-5 sentences: Explain HOW elements connect, WHY they connect this way, what flows between them, describe the relationship and any transformations"
+            "narration": "4-5 sentences: Explain HOW elements connect, WHY they connect this way, what flows between them, describe the relationship"
         }},
         {{
-            "concept": "SLIDE 3 - ADVANCED INTERACTIONS: Show 6-10 elements with bidirectional connections, feedback loops, or cycles. Use curved arrows, color transitions, or animations to show dynamic flow. If comparing, show complex interactions on BOTH sides.",
+            "concept": "ULTRA-SPECIFIC: Show COMPLEX INTERACTIONS - multiple elements with bidirectional connections. If comparing, show interactions on BOTH sides.",
             "complexity": "advanced",
-            "narration": "4-5 sentences: Describe the complete flow, explain each transformation step, mention all connection points, explain feedback mechanisms and the overall process"
+            "narration": "4-5 sentences: Describe the complete flow, explain each transformation step, mention all connection points, explain the overall process"
         }},
         {{
-            "concept": "SLIDE 4 - SPECTACULAR FINALE: Show the COMPLETE SYSTEM with 10+ elements, multiple layers, advanced animations (transforms, pulses, highlights). Use loops to generate patterns. Show the entire cycle working together. If comparing, show FINAL STATE of both sides with all interactions visible.",
+            "concept": "COMPLEX ANIMATION: COMPLETE SYSTEM - all elements working together. If comparing, show the FINAL STATE of both sides side-by-side.",
             "complexity": "complex",
-            "narration": "5-6 sentences: Describe the entire system in action, explain how all parts work together, mention all feedback mechanisms, describe the complete cycle from start to finish, emphasize the overall harmony"
+            "narration": "5-6 sentences: Describe the entire system, explain how all parts work together, mention feedback mechanisms, describe the complete cycle from start to finish"
         }}
     ]
 }}
@@ -4208,7 +4207,6 @@ class FixedScene(MovingCameraScene):
     for idx, slide in enumerate(animation_slides):
         concept = slide.get('concept', '')
         narration = slide.get('narration', '')  # GET THE NARRATION!
-        complexity = slide.get('complexity', 'simple')  # GET THE COMPLEXITY LEVEL!
         total_duration = durations[dur_idx][1] if dur_idx < len(durations) else 10.0
         dur_idx += 1
         
@@ -4217,9 +4215,9 @@ class FixedScene(MovingCameraScene):
         video_overhead = 1.1
         target_duration = max(total_duration - video_overhead, 3.0)  # Minimum 3s
         
-        # Generate AI animation that MATCHES the narration AND complexity level
+        # Generate AI animation that MATCHES the narration
         # CRITICAL: skip_global_sync=True preserves per-slide timing
-        animation_code = generate_centered_animation(concept, narration, target_duration, client, skip_global_sync=True, complexity=complexity)
+        animation_code = generate_centered_animation(concept, narration, target_duration, client, skip_global_sync=True)
 
         
         # Indent the code to fit inside construct()
@@ -4418,56 +4416,13 @@ def generate_with_ai_critic_loop(client, prompt, requirements, concept="", narra
     return None, False
 
 
-def generate_centered_animation(concept, narration, target_duration, client, skip_global_sync=False, complexity="simple"):
-    """Generate animation that MATCHES narration exactly AND follows complexity level"""
-    
-    # COMPLEXITY-SPECIFIC RULES
-    complexity_rules = {
-        "simple": """
-🎯 COMPLEXITY LEVEL: SIMPLE (Slide 1)
-- Use 2-4 basic shapes (Circle, Square, Rectangle)
-- Simple positioning (no complex arrangements)
-- Basic animations (Create, FadeIn, Write)
-- Clear, large labels
-- Example: Show individual elements with names
-""",
-        "intermediate": """
-🎯 COMPLEXITY LEVEL: INTERMEDIATE (Slide 2)
-- Use 4-6 objects with simple connections
-- Add 1-2 arrows showing relationships
-- Use Transform or MoveToTarget
-- Group related elements with VGroup
-- Example: Show how 2-3 elements connect
-""",
-        "advanced": """
-🎯 COMPLEXITY LEVEL: ADVANCED (Slide 3)
-- Use 6-10 objects with multiple connections
-- Add bidirectional arrows or curved paths
-- Use ReplacementTransform, Indicate, Circumscribe
-- Create visual flow or cycle
-- Example: Show complex interactions between elements
-""",
-        "complex": """
-🎯 COMPLEXITY LEVEL: COMPLEX (Slide 4 - FINAL SLIDE)
-⚠️ THIS IS THE LAST SLIDE - MAKE IT SPECTACULAR!
-- Use 10+ objects in sophisticated arrangement
-- Multiple animation layers (transforms + effects)
-- Advanced techniques: TracedPath, ShowPassingFlash, FadeToColor
-- Create complete system visualization
-- Use loops to generate patterns
-- Combine multiple animation types
-- Example: Show entire system working together with all feedback loops
-"""
-    }
-    
-    complexity_instruction = complexity_rules.get(complexity, complexity_rules["simple"])
+def generate_centered_animation(concept, narration, target_duration, client, skip_global_sync=False):
+    """Generate animation that MATCHES narration exactly"""
     
     prompt = f"""Create Manim visualization for: {concept}
 
 NARRATION (READ CAREFULLY):
 "{narration}"
-
-{complexity_instruction}
 
 🎨 BE CREATIVE & ADVANCED - NOT SIMPLE!
 - Use transformations, paths, curves, and motion
@@ -4493,10 +4448,6 @@ CRITICAL RULES:
 6. **NO GOING BACK**: Once an animation moves forward, don't animate backwards unless narration says so. Keep animations progressive!
 7. **STAY ON-SCREEN**: ALL objects MUST fit on screen! Screen is 14 units wide × 7 units tall. Use radius≤2, height≤4, width≤10. If creating many objects, use .scale(0.8) BEFORE animating to ensure they fit!
 8. **ONLY SHOW WHAT NARRATION MENTIONS**: Do NOT add extra arrows, feedback loops, or creative elements not in narration! If narration says "A connects to B", show ONE arrow from A to B. NO random arrows, NO loops back, NO extra connections!
-9. **VERTICAL ARRANGEMENT FOR COMPARISONS**: If comparing two things (AI vs Human, Left vs Right), arrange them VERTICALLY (UP/DOWN), NOT horizontally! Horizontal arrangements cause overlap.
-   - ✅ CORRECT: left_group.shift(UP * 2), right_group.shift(DOWN * 2)
-   - ❌ WRONG: left_group.shift(LEFT * 3), right_group.shift(RIGHT * 3)  # Will overlap!
-
 
 ❌ WRONG (shows one circle at a time):
 ```python
@@ -4528,42 +4479,32 @@ self.play(Create(circle1), Create(circle2), Create(circle3))
 
 🔴 LAYOUT CONSTRAINTS FOR COMPARISONS (A vs B):
 **If concept involves comparing two things (Brain vs AI, Python vs Java, etc.):**
-1. **UP-DOWN SPLIT**: Put "A" elements on TOP, "B" elements on BOTTOM (NOT left-right!)
-2. **USE .shift()**: After creating all objects, use `.shift(UP * 2)` for A-side, `.shift(DOWN * 2)` for B-side
-3. **ADD SECTION LABELS**: ALWAYS add Text labels "AI" and "Human" (or "A" and "B") to identify each section
-4. **LIMIT OBJECTS**: Max 3-4 objects per side (total 6-8 objects) to fit on screen
-5. **SMALL CIRCLES**: Use radius=0.6 for circles (NOT radius=1.0 or larger!)
-6. **COMPACT LAYOUT**: Use `buff=1.0` for spacing (NOT buff=2.0 or larger!)
+1. **LEFT-RIGHT SPLIT**: Put "A" elements on LEFT side, "B" elements on RIGHT side
+2. **USE .shift()**: After creating all objects, use `.shift(LEFT * 3)` for A-side, `.shift(RIGHT * 3)` for B-side
+3. **LIMIT OBJECTS**: Max 3-4 objects per side (total 6-8 objects) to fit on screen
+4. **SMALL CIRCLES**: Use radius=0.6 for circles (NOT radius=1.0 or larger!)
+5. **COMPACT LAYOUT**: Use `buff=1.0` for spacing (NOT buff=2.0 or larger!)
 
 Example for "Brain vs AI":
 ```python
-# TOP SECTION: Brain (3 nodes)
+# LEFT SIDE: Brain (3 nodes)
 brain_nodes = VGroup(
     Circle(radius=0.6, color=BLUE),
     Circle(radius=0.6, color=BLUE),
     Circle(radius=0.6, color=BLUE)
 )
-brain_nodes.arrange(RIGHT, buff=1.0)
-brain_nodes.shift(UP * 2)  # Move to top
+brain_nodes.arrange(DOWN, buff=1.0)
+brain_nodes.shift(LEFT * 3)  # Move to left side
 
-# SECTION LABEL for Brain
-brain_label = Text("Human", font_size=24, color=WHITE)
-brain_label.next_to(brain_nodes, UP, buff=0.5)
-
-# BOTTOM SECTION: AI (3 nodes)
+# RIGHT SIDE: AI (3 nodes)
 ai_nodes = VGroup(
     Circle(radius=0.6, color=GREEN),
     Circle(radius=0.6, color=GREEN),
     Circle(radius=0.6, color=GREEN)
 )
-ai_nodes.arrange(RIGHT, buff=1.0)
-ai_nodes.shift(DOWN * 2)  # Move to bottom
-
-# SECTION LABEL for AI
-ai_label = Text("AI", font_size=24, color=WHITE)
-ai_label.next_to(ai_nodes, DOWN, buff=0.5)
+ai_nodes.arrange(DOWN, buff=1.0)
+ai_nodes.shift(RIGHT * 3)  # Move to right side
 ```
-
 
 🔴 NESTED CIRCLES / VENN DIAGRAMS:
 **For AI/ML/DL relationships or any nested concept:**
@@ -5114,53 +5055,6 @@ Generate code:"""
             if match_ratio < 0.05 and len(code_labels) > 0:
                 issues.append(f"Animation seems unrelated to narration. Consider using some terms from: {', '.join(list(key_narration_terms)[:3])}")
         
-        # Check 8b: SPECIFIC OBJECT COUNT VALIDATION
-        # If narration says "three circles", code should have 3 Circle() objects
-        narration_lower = narration.lower()
-        
-        # Check for number + object type patterns
-        object_patterns = {
-            'circle': r'Circle\(',
-            'square': r'Square\(',
-            'rectangle': r'Rectangle\(',
-            'line': r'Line\(',
-            'arrow': r'Arrow\(',
-            'dot': r'Dot\(',
-        }
-        
-        number_words = {
-            'one': 1, 'two': 2, 'three': 3, 'four': 4, 'five': 5,
-            'six': 6, 'seven': 7, 'eight': 8, 'nine': 9, 'ten': 10,
-            '1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10
-        }
-        
-        for obj_name, obj_pattern in object_patterns.items():
-            # Check if narration mentions a number + this object type
-            for num_word, num_value in number_words.items():
-                # Pattern: "three circles" or "3 circles"
-                if f'{num_word} {obj_name}' in narration_lower:
-                    # Count how many of this object are in the code
-                    actual_count = len(re.findall(obj_pattern, ai_code))
-                    if actual_count != num_value:
-                        issues.append(f"CRITICAL: Narration says '{num_word} {obj_name}s' but code has {actual_count} {obj_name.capitalize()}() objects! Create exactly {num_value} {obj_name.capitalize()}() objects.")
-                        break
-        
-        # Check 8c: ORIENTATION VALIDATION
-        # If narration says "vertical line", code should have vertical Line (not horizontal)
-        # If narration says "horizontal line", code should have horizontal Line
-        if 'vertical line' in narration_lower:
-            # Check if there's a Line with vertical orientation (start/end have same x, different y)
-            vertical_line_pattern = r'Line\([^)]*start\s*=\s*\[[^,]+,\s*[^,]+[^)]*end\s*=\s*\[[^,]+,\s*[^,]+[^)]*\)'
-            # This is complex to validate perfectly, so just warn if we see "horizontal" patterns
-            if 'start=[-' in ai_code and ', 0,' in ai_code and 'end=[' in ai_code:
-                # Likely horizontal line pattern: start=[-7, 0, 0], end=[7, 0, 0]
-                issues.append("CRITICAL: Narration says 'vertical line' but code appears to create horizontal Line! Use start=[0, -3, 0], end=[0, 3, 0] for vertical.")
-        
-        if 'horizontal line' in narration_lower:
-            # Similar check for horizontal
-            if 'start=[0,' in ai_code and 'end=[0,' in ai_code:
-                issues.append("CRITICAL: Narration says 'horizontal line' but code appears to create vertical Line! Use start=[-7, 0, 0], end=[7, 0, 0] for horizontal.")
-        
         # Check 9: PREMATURE FADEOUT - Objects removed before they should be visible
         # If narration mentions "3 circles", "nested", "together", etc., check for FadeOut
         multi_object_keywords = ['circles', 'nested', 'together', 'all', 'three', 'multiple', 'both']
@@ -5591,86 +5485,39 @@ Generate CORRECTED code (flush left, no class/def):"""
     # FIX 2B: Final Safety Scaling (Content Overflow Fix - AFTER animations)
     # IMPORTANT: This runs INSTANTLY (no animation) so users don't see scaling
     final_scaling_code = """
-# FINAL SAFETY SCALING: Ensure nothing goes off-screen (SMOOTH ANIMATION)
+# FINAL SAFETY SCALING: Ensure nothing goes off-screen (INSTANT, NO ANIMATION)
 all_mobs = Group(*self.mobjects)
 if len(all_mobs) > 0:
-    # Calculate scale factor needed based on ACTUAL BOUNDS
+    # Calculate scale factor needed
     scale_factor = 1.0
+    if all_mobs.width > 12:
+        scale_factor = min(scale_factor, 12 / all_mobs.width)
+    if all_mobs.height > 6.5:
+        scale_factor = min(scale_factor, 6.5 / all_mobs.height)
     
-    # Check if objects go beyond screen bounds
-    # Screen bounds: x: [-7, 7], y: [-4, 4]
-    top = all_mobs.get_top()[1]
-    bottom = all_mobs.get_bottom()[1]
-    left = all_mobs.get_left()[0]
-    right = all_mobs.get_right()[0]
-    
-    # Calculate required scale to fit within bounds
-    if top > 3.5:
-        scale_factor = min(scale_factor, 3.5 / top)
-    if bottom < -3.5:
-        scale_factor = min(scale_factor, 3.5 / abs(bottom))
-    if right > 6.5:
-        scale_factor = min(scale_factor, 6.5 / right)
-    if left < -6.5:
-        scale_factor = min(scale_factor, 6.5 / abs(left))
-    
-    # Apply scaling SMOOTHLY (subtle animation so users don't notice)
+    # Apply scaling INSTANTLY (no animation)
     if scale_factor < 1.0:
-        self.play(all_mobs.animate.scale(scale_factor, about_point=ORIGIN), run_time=0.5)
+        all_mobs.scale(scale_factor, about_point=ORIGIN)
     
-    # Center if still off-screen after scaling
-    shift_needed = False
-    shift_vector = np.array([0, 0, 0])
-    if all_mobs.get_top()[1] > 3.5:
-        shift_vector += DOWN * (all_mobs.get_top()[1] - 3.5)
-        shift_needed = True
-    if all_mobs.get_bottom()[1] < -3.5:
-        shift_vector += UP * ((-3.5) - all_mobs.get_bottom()[1])
-        shift_needed = True
+    # Center if off-screen (INSTANT shift)
     if all_mobs.get_left()[0] < -6.5:
-        shift_vector += RIGHT * ((-6.5) - all_mobs.get_left()[0])
-        shift_needed = True
+        all_mobs.shift(RIGHT * ((-6.5) - all_mobs.get_left()[0]))
     if all_mobs.get_right()[0] > 6.5:
-        shift_vector += LEFT * (all_mobs.get_right()[0] - 6.5)
-        shift_needed = True
-    
-    if shift_needed:
-        self.play(all_mobs.animate.shift(shift_vector), run_time=0.3)
+        all_mobs.shift(LEFT * (all_mobs.get_right()[0] - 6.5))
     """
     import textwrap
     final_scaling_code = textwrap.dedent(final_scaling_code)
-    
-    # BEST APPROACH: Insert scaling RIGHT BEFORE first self.play()
-    # This ensures all objects are created but animations haven't started
-    
-    lines = ai_code.split('\n')
-    first_play_index = -1
-    
-    # Find first self.play()
-    for i, line in enumerate(lines):
-        if 'self.play(' in line.strip():
-            first_play_index = i
-            break
-    
-    # Insert scaling code right before first animation
-    if first_play_index != -1:
-        lines.insert(first_play_index, final_scaling_code)
-        ai_code = '\n'.join(lines)
-        print(f"   🎯 Inserted scaling before first animation at line {first_play_index}")
-    else:
-        # Fallback: add at end
-        ai_code += f"\n{final_scaling_code}"
-        print("   ⚠️  Using fallback: scaling at end")
     
     # Calculate remaining wait needed (only if not skipping global sync)
     # FIX: Add 20% buffer to wait time to prevent early fade-out
     if not skip_global_sync:
         wait_time = max(0.5, (target_duration - total_anim_time) * 1.2)  # 20% buffer
-        # Append the wait call AFTER scaling
-        ai_code += f"\nself.wait({wait_time:.2f})"
+        # Append the wait call AND the final scaling code
+        ai_code += f"\n{final_scaling_code}\nself.wait({wait_time:.2f})"
     else:
-        # Just add a small buffer wait to prevent premature fade
-        ai_code += f"\nself.wait(0.5)"
+        # Just add final scaling code, AI already handled timing
+        # But still add a small buffer wait to prevent premature fade
+        ai_code += f"\n{final_scaling_code}\nself.wait(0.5)"
     
 
     
